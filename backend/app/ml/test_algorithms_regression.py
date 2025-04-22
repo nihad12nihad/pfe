@@ -33,8 +33,8 @@ def test_regression_algorithm(algorithm, data_path, target_column):
 
 def main():
     # Remplace par ton vrai dataset et le nom de la colonne cible
-    data_path = "chemin/vers/ton_dataset.csv"
-    target_column = "NomDeLaColonneCible"
+    data_path = "datasets/california_housing.csv"
+    target_column = "MedHouseVal"
 
     algorithms = [
         LinearRegressionModel(),

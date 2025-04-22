@@ -16,9 +16,20 @@ class DecisionTreeParams(BaseModel):
     criterion: str = "gini"
     max_depth: Optional[int] = None
 
+class NaiveBayesParams(BaseModel):
+    model_type: Optional[str] = "auto"
+
 class NeuralNetworkParams(BaseModel):
     hidden_layer_sizes: List[int] = [100]
     max_iter: int = 200
+
+class RandomForestParams(BaseModel):
+    n_estimators: int = 100
+    max_depth: Optional[int] = None
+
+class SVMParams(BaseModel):
+    kernel: str = "rbf"
+    c: float = 1.0
 
 class DBSCANParams(BaseModel):
     eps: float = 0.5
@@ -66,10 +77,13 @@ def analyze(request: AnalyzeRequest):
             )
 
         elif algo == "naive_bayes":
-            result = naive_bayes.run(
+                params = NaiveBayesParams(**request.parameters)
+                result = naive_bayes.run(
                 data_path=request.data_path,
-                target_column=request.target_column
+                target_column=request.target_column,
+                model_type=params.model_type
             )
+
 
         elif algo == "neural_network":
             params = NeuralNetworkParams(**request.parameters)

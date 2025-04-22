@@ -25,7 +25,7 @@ def test_clustering(algorithm, data_path):
 
 def main():
     # Spécifie le chemin vers le dataset SANS colonne cible
-    data_path = "chemin/vers/ton_dataset.csv"  # Remplace par ton vrai chemin !
+    data_path = "datasets/moons.csv"  # Remplace par ton vrai chemin !
 
     algorithms = [
         KMeansClustering(n_clusters=3),

@@ -20,5 +20,5 @@ def test_apriori(data_path):
         logging.error(f"Erreur dans Apriori: {str(e)}")
 
 if __name__ == "__main__":
-    data_path = "chemin/vers/ton_dataset.csv"  # Mets le bon chemin ici
+    data_path = "datasets/market_basket.csv"  # Mets le bon chemin ici
     test_apriori(data_path)

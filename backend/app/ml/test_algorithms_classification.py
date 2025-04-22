@@ -28,8 +28,8 @@ def test_algorithm(algorithm, data_path, target_column):
 
 def main():
     # Spécifie le chemin vers le dataset et la colonne cible
-    data_path = "chemin/vers/ton_dataset.csv"  # Remplace par le chemin réel de ton dataset
-    target_column = "NomDeLaColonneCible"      # Remplace par le nom de ta colonne cible
+    data_path = "datasets/iris.csv"  # Remplace par le chemin réel de ton dataset
+    target_column = "target"      # Remplace par le nom de ta colonne cible
 
     algorithms = [
         KNNModel(),
