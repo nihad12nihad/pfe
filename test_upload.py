@@ -1,36 +1,61 @@
-from werkzeug.datastructures import FileStorage
-from backend.app.api.upload_routes import upload_file
+# test_pipeline.py
+
 import pandas as pd
-import os
+from app.core.preprocessing import handle_missing_values, encode_data, normalize_data, select_features
+from app.core.visualisation import (
+    plot_correlation_matrix, plot_histogram, plot_boxplot, 
+    plot_categorical_count, plot_linear_relationship, 
+    plot_missing_values, plot_unique_values
+)
 
-try:
-    import openpyxl
-except ImportError:
-    print("Erreur: Le module 'openpyxl' n'est pas installé.")
-    print("Installez-le avec : pip install openpyxl")
-    exit(1)
+# 1. Charger un dataset d'exemple (ex: Iris dataset)
+from sklearn.datasets import load_iris
+iris = load_iris(as_frame=True)
+df = iris.frame
 
+# Ajouter une colonne catégorielle artificielle pour le test
+df['type_fleur'] = df['target'].map({0: 'setosa', 1: 'versicolor', 2: 'virginica'})
 
-# 1. Créer un fichier Excel de test
-df = pd.DataFrame({"id": [1, 2], "nom": ["Alice", "Bob"], "age": [30, 25]})
-df.to_excel("test.xlsx", index=False)
+# 2. Pipeline de prétraitement
+print("🔵 Données originales:")
+print(df.head())
 
-# 2. Tester la conversion
-with open("test.xlsx", "rb") as f:
-    file = FileStorage(stream=f, filename="test.xlsx")
-    result_path, error = upload_file(file)  # Appel de votre fonction
+# a. Gérer les valeurs manquantes
+df = handle_missing_values(df)
 
-    # 3. Afficher les résultats
-    if error:
-        print(f"❌ ERREUR: {error}")
-    else:
-        print(f"✅ SUCCÈS ! Fichier converti : {result_path}")
-        print("Contenu du CSV généré :")
-        with open(result_path, "r") as result_file:
-            print(result_file.read())
+# b. Encodage (exemple)
+df = encode_data(df, categorical_mapping={'type_fleur': {'setosa': 0, 'versicolor': 1, 'virginica': 2}})
 
-# 4. Nettoyage (supprime les fichiers temporaires)
-if os.path.exists("test.xlsx"):
-    os.remove("test.xlsx")
-if os.path.exists(result_path):
-    os.remove(result_path)  # Optionnel : supprime le CSV généré
+# c. Normalisation
+df = normalize_data(df)
+
+# d. Sélection de features
+df = select_features(df, target_col='target', method='kbest', k=3)
+
+print("✅ Données après prétraitement:")
+print(df.head())
+
+# 3. Visualisations
+print("📊 Génération des graphiques...")
+
+# Matrice de corrélation
+plot_correlation_matrix(df)
+
+# Histogramme sur une colonne numérique
+plot_histogram(df, column=df.columns[0])
+
+# Boxplot sur une colonne numérique
+plot_boxplot(df, column=df.columns[1])
+
+# (Pas de variables catégorielles après encodage et sélection, mais tu pourrais ajouter un test ici)
+
+# Nuage de points entre deux colonnes
+plot_linear_relationship(df, x_col=df.columns[0], y_col=df.columns[1])
+
+# Valeurs manquantes
+plot_missing_values(df)
+
+# Valeurs uniques
+plot_unique_values(df)
+
+print("🎉 Test global terminé. Graphiques sauvegardés dans le dossier courant.")
