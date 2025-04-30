@@ -5,9 +5,7 @@ from ml.regression import linear_regression, multiple_regression
 from ml.clustering import kmeans, dbscan, agglomerative
 from ml.association import apriori
 
-def get_algorithm(name):
-    name = name.lower()
-
+def get_algorithm(name: str):
     algorithms = {
         "knn": knn.run,
         "decision_tree": decision_tree.run,
@@ -20,7 +18,7 @@ def get_algorithm(name):
         "kmeans": kmeans.run,
         "dbscan": dbscan.run,
         "agglomerative": agglomerative.run,
-        "apriori": apriori.run
+        "apriori": apriori.run,
     }
 
     name = name.lower()
