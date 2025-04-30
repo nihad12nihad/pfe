@@ -75,4 +75,72 @@ def plot_unique_values(df: pd.DataFrame):
 
 
 
+import matplotlib 
+#matplotlib.use('agg')
+import matplotlib.pyplot as plt
+import seaborn as sns
+from typing import Dict, Any,Optional
+import numpy as np
+from pathlib import Path
+
+def ensure_directory(path : str) -> Path :
+     path=Path(path).absolute()
+     path.parent.mkdir(parents=True, exist_ok=True)
+     return path
+
+def plot_classification_results(metrics: dict[str, float], algorithm_name: str, output_dir: str="backend/data/processed") -> Optional[str]:
+    try:
+        plt.figure(figsize=(10,5))
+        ax=sns.barplot(x=list(metrics.keys()),y=list(metrics.values()))
+        ax.bar_label(ax.containers[0], fmt='%.2f')
+        plt.title(f"performance de {algorithm_name}",pad=20)
+        plt.ylabel("score",fontweight='bold')
+        plt.ylim(0,1)
+        plt.grid(axis='y',alpha=0.3)
+        
+        plot_path=ensure_directory(f"{output_dir}/plot_{algorithm_name}.png")
+        plt.savefig(plot_path, bbox_inches='tight', dpi=120)
+        plt.show()
+        plt.close()
+        return str(plot_path)
+    except Exception as e:
+        print(f"erreur lors de la génération du grapique : {e}")
+        return None
+    
+def plot_confusion_matrix(cm:np.ndarray, labels: list[str],output_dir: str="backend/data/processed") -> Optional[str]:
+    try:
+        plt.figure(figsize=(8,6))
+        sns.heatmap(cm, annot=True, fmt="d",xticklabels=labels, yticklabels=labels, cmap="Blues", cbar=False)
+        plt.title("matrice de confusion", pad=15)
+        plt.xlabel("prédit", fontweight='bold')
+        plt.ylabel("Réel", fontweight='bold')
+        
+        plot_path= ensure_directory(f"{output_dir}/confusion_matrix.png")
+        plt.savefig(plot_path, bbox_inches='tight', dpi=120)
+        plt.show()
+        plt.close()
+        return str(plot_path)
+    except Exception as e:
+        print(f"errur lors de la génération de la matrice : {e}")
+        return None
+    
+def plot_clusters(data: np.ndarray, labels: np.ndarray, output_dir: str="backend/data/processd", title: str="visualisation des clusters") -> Optional[str]:
+    try:
+        if data.shape[1]<2:
+            raise ValueError("les données doivent avoir au moins 2 dismensions")
+        plt.figure(figsize=(8,6))
+        scatter=plt.scatter(data[:,0],data[:,1], c=labels, cmap="viridis", alpha=0.6, edgecolors='w', linewidths=0.5)
+        plt.legend(*scatter.legend_elements(), title="clusters")
+        plt.title(title, pad=15)
+        plt.grid(alpha=0.3)
+        
+        plot_path=ensure_directory(f"{output_dir}/clusters.png")
+        plt.savefig(plot_path, bbox_inches='tight', dpi=120)
+        plt.show()
+        plt.close()
+        return str(plot_path)
+    except Exception as e:
+        print(f"errue lors de la visualisation des clusters : {e}")
+        return None     
+
 
