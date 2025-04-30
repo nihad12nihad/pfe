@@ -13,14 +13,6 @@ from pydantic import BaseModel
 from results.visualisation import plot_classification_results
 from results.export import export_to_csv, export_to_json, export_to_excel
 
-# def load_algorithm_results(algorithm_name: str) -> dict:
-   #return {
-       #"metrics":{
-        #   "accuracy": 0.95,
-         # "precision": 0.89
-       #}
-   #}
-        
 
 router = APIRouter(prefix="/compare", tags=["Algorithm Comparison"])
 logger = logging.getLogger(__name__)
