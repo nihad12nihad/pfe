@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from sklearn.neural_network import MLPClassifier
+from sklearn.svm import SVC
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
     accuracy_score,
@@ -16,14 +16,13 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 
-class NeuralNetworkModel:
-    """Classe Réseau de Neurones (MLPClassifier) avec gestion d'erreurs et sauvegarde des résultats."""
+class SVMModel:
+    """Classe Support Vector Machine (SVM) avec gestion d'erreurs et sauvegarde des résultats."""
 
-    def __init__(self, hidden_layer_sizes=(100,), activation='relu', solver='adam', max_iter=300):
-        self.hidden_layer_sizes = hidden_layer_sizes
-        self.activation = activation
-        self.solver = solver
-        self.max_iter = max_iter
+    def __init__(self, kernel='rbf', C=1.0, gamma='scale'):
+        self.kernel = kernel
+        self.C = C
+        self.gamma = gamma
         self.model = None
         self.label_encoder = LabelEncoder()
         self.results = {}
@@ -47,7 +46,7 @@ class NeuralNetworkModel:
             raise ValueError(f"Erreur de chargement des données : {str(e)}")
 
     def train(self, data_path, target_column, test_size=0.2):
-        """Entraîne et évalue le modèle de réseau de neurones."""
+        """Entraîne et évalue le modèle SVM."""
         try:
             X, y = self.load_data(data_path, target_column)
 
@@ -55,11 +54,10 @@ class NeuralNetworkModel:
                 X, y, test_size=test_size, random_state=42
             )
 
-            self.model = MLPClassifier(
-                hidden_layer_sizes=self.hidden_layer_sizes,
-                activation=self.activation,
-                solver=self.solver,
-                max_iter=self.max_iter,
+            self.model = SVC(
+                kernel=self.kernel,
+                C=self.C,
+                gamma=self.gamma,
                 random_state=42
             )
             self.model.fit(X_train, y_train)
@@ -67,12 +65,11 @@ class NeuralNetworkModel:
             y_pred = self.model.predict(X_test)
 
             self.results = {
-                "model": "NeuralNetwork",
+                "model": "SVM",
                 "parameters": {
-                    "hidden_layer_sizes": self.hidden_layer_sizes,
-                    "activation": self.activation,
-                    "solver": self.solver,
-                    "max_iter": self.max_iter,
+                    "kernel": self.kernel,
+                    "C": self.C,
+                    "gamma": self.gamma,
                     "test_size": test_size,
                 },
                 "metrics": {
@@ -86,13 +83,13 @@ class NeuralNetworkModel:
                     int(i): label for i, label in enumerate(self.label_encoder.classes_)
                 },
             }
-            logging.info("Modèle Réseau de Neurones entraîné avec succès.")
+            logging.info("Modèle SVM entraîné avec succès.")
             return self.results
 
         except Exception as e:
             return {"error": str(e), "status": "failed"}
 
-    def save_results(self, output_path="results/neural_network_results.json"):
+    def save_results(self, output_path="results/svm_results.json"):
         """Sauvegarde des résultats au format JSON."""
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, "w") as f:
@@ -100,17 +97,7 @@ class NeuralNetworkModel:
         logging.info(f"Résultats sauvegardés dans {output_path}.")
         return output_path
 
-    def predict(self, X_new):
-        """Effectue une prédiction sur de nouvelles données."""
-        if self.model is None:
-            raise ValueError("Le modèle n'a pas encore été entraîné.")
-        try:
-            predictions = self.model.predict(X_new)
-            return self.label_encoder.inverse_transform(predictions).tolist()
-        except Exception as e:
-            raise ValueError(f"Erreur lors de la prédiction : {str(e)}")
-
 def run(data_path, target_column, test_size=0.2):
-    nn_model = NeuralNetworkModel()
-    results = nn_model.train(data_path, target_column, test_size)
+    svm_model = SVMModel()
+    results = svm_model.train(data_path, target_column, test_size)
     return results
