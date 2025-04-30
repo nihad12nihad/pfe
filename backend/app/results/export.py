@@ -10,7 +10,7 @@ from sklearn.ensemble import RandomForestClassifier
 def ensure_dir_exists(output_dir: str) -> Path:
     """Crée le dossier s'il n'existe pas et retourne le chemin absolu"""
     path = Path(output_dir)
-    path.mkdir(parents=True, exist_ok=True)  # parents=True crée toute l'arborescence
+    path.mkdir(parents=True, exist_ok=True)  # par nts=True crée toute l'arborescence
     return path
 
 def export_to_csv(data: dict, filename: str, output_dir: str = "backend/data/processed") -> str:

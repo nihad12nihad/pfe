@@ -58,7 +58,7 @@ def get_secure_path(filename: str) -> Path:
     path=(EXPORT_DIR / clean_name).resolve()
     
     if not path.parent.samefile(EXPORT_DIR):
-        logger.warning(f"Tentative d'accès non sécursé :{filename}")
+        logger.warning(f"Tentative d'accès non sécurisé:{filename}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="accès refusé : chemin invalide"

@@ -27,7 +27,7 @@ def validate_algorithm_name(name: str) -> bool:
 def mock_load_algorithm_results(algorithm_name: str) -> Dict[str, any]:
     allowed_chars = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-")
     if not all(c in allowed_chars for c in algorithm_name):
-        raise ValueError(f"nom d'algorithme invalide : {algorithm_name}")
+        raise ValueError(f"nom  'algorithme invalide : {algorithm_name}")
     
     base_metrics = {
         "accuracy": round(random.uniform(0.8, 0.95), 4),

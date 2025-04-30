@@ -127,7 +127,7 @@ def plot_confusion_matrix(cm:np.ndarray, labels: list[str],output_dir: str="back
 def plot_clusters(data: np.ndarray, labels: np.ndarray, output_dir: str="backend/data/processd", title: str="visualisation des clusters") -> Optional[str]:
     try:
         if data.shape[1]<2:
-            raise ValueError("les données doivent avoir au moins 2 dismensions")
+            raise ValueError("les données doivent avoir au moins 2 dismensions ")
         plt.figure(figsize=(8,6))
         scatter=plt.scatter(data[:,0],data[:,1], c=labels, cmap="viridis", alpha=0.6, edgecolors='w', linewidths=0.5)
         plt.legend(*scatter.legend_elements(), title="clusters")
