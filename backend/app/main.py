@@ -1,27 +1,20 @@
 from fastapi import FastAPI
-from app.api import (
-    auth_routes,
-    upload_routes,
-    preprocess_routes,
-    analyze_routes,
-    compare_routes,
-    export_routes
-)
+from fastapi.staticfiles import StaticFiles
+from app.api import preprocess_routes  # Correct
+from app.api import visualisation_routes  # Utilisation de l'import relatif
 
-app = FastAPI(title="Data Mining API", version="1.0")
 
-# Inclusion des routes depuis les différents modules
-app.include_router(auth_routes.router, prefix="/auth", tags=["Auth"])
-app.include_router(upload_routes.router, prefix="/upload", tags=["Upload"])
-app.include_router(preprocess_routes.router, prefix="/preprocess", tags=["Preprocessing"])
-app.include_router(analyze_routes.router, prefix="/analyze", tags=["Analyze"])
-app.include_router(compare_routes.router, prefix="/compare", tags=["Compare"])
-app.include_router(export_routes.router, prefix="/export", tags=["Export"])
 
-# Route de test
-@app.get("/")
-def read_root():
-    return {"message": "Bienvenue sur l'API de fouille de données 🎯"}
+# Création de l'application FastAPI
+app = FastAPI()
 
+# Inclure les routes de prétraitement
+app.include_router(preprocess_routes.router, prefix="/api")
+
+# Montée du dossier static pour que FastAPI puisse y accéder et servir les fichiers
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Ajout des routes définies dans visualisation_routes.py
+app.include_router(vis_router)
 
 

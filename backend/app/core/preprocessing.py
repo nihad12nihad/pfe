@@ -1,29 +1,24 @@
 import pandas as pd
 import numpy as np
 from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.feature_selection import SelectKBest, f_classif, f_regression
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
+
 
 def handle_missing_values(df, numeric_strategy='mean', categorical_strategy='constant'):
     """
     Gère les valeurs manquantes dans un DataFrame.
-    
-    Args:
-        df: DataFrame pandas
-        numeric_strategy: 'mean', 'median' ou 'most_frequent'
-        categorical_strategy: 'constant' ou 'most_frequent'
-    
-    Returns:
-        DataFrame transformé
     """
     df = df.copy()
-    
     numeric_cols = df.select_dtypes(include=np.number).columns
     categorical_cols = df.select_dtypes(exclude=np.number).columns
-    
+
     if len(numeric_cols) > 0:
         imputer = SimpleImputer(strategy=numeric_strategy)
         df[numeric_cols] = pd.DataFrame(imputer.fit_transform(df[numeric_cols]),
                                         columns=numeric_cols, index=df.index)
-    
+
     if len(categorical_cols) > 0:
         if categorical_strategy == 'constant':
             df[categorical_cols] = df[categorical_cols].fillna('MANQUANT')
@@ -31,82 +26,77 @@ def handle_missing_values(df, numeric_strategy='mean', categorical_strategy='con
             imputer = SimpleImputer(strategy=categorical_strategy)
             df[categorical_cols] = pd.DataFrame(imputer.fit_transform(df[categorical_cols]),
                                                 columns=categorical_cols, index=df.index)
-    
-    return df  
-
-
+    return df
 
 import pandas as pd
-from typing import Dict, List, Union, Optional
+from typing import Optional, Dict, Tuple, List, Union
+from sklearn.preprocessing import OneHotEncoder
 
-def encode_data(df: pd.DataFrame, 
-                interval_cols: Optional[Dict[str, tuple]] = None, 
-                categorical_mapping: Optional[Dict[str, Dict]] = None) -> pd.DataFrame:
+def encode_data(
+    df: pd.DataFrame,
+    interval_cols: Optional[Dict[str, Tuple[List[float], List[str]]]] = None,
+    categorical_mapping: Optional[Dict[str, Dict[str, Union[int, float]]]] = None,
+    encoding_strategy: str = 'onehot'
+) -> pd.DataFrame:
     """
     Encode les variables catégorielles et numériques dans un DataFrame.
-    
+
     Args:
         df: DataFrame pandas à encoder
-        interval_cols: Dictionnaire des colonnes numériques à discrétiser.
-                      Format: {'col_name': ([bornes], [labels])}
-                      Ex: {'age': ([0, 18, 65, 100], ['enfant', 'adulte', 'senior'])}
-        categorical_mapping: Dictionnaire des mappings pour les colonnes catégorielles.
-                            Format: {'col_name': {'cat1': val1, 'cat2': val2}}
-                            Ex: {'gender': {'M': 0, 'F': 1}}
-    
+        interval_cols: Colonnes numériques à discrétiser, format:
+                       {'col_name': ([bornes], [labels])}
+        categorical_mapping: Mapping manuel des colonnes catégorielles
+        encoding_strategy: Méthode d'encodage si pas de mapping fourni :
+                           'onehot', 'label', 'ordinal'
+
     Returns:
-        DataFrame transformé avec les encodages appliqués
-        
-    Exemple:
-        >>> df = pd.DataFrame({'age': [10, 25, 70], 'gender': ['M', 'F', 'M']})
-        >>> encoded = encode_data(
-        ...     df,
-        ...     interval_cols={'age': ([0, 18, 65, 100], ['enfant', 'adulte', 'senior'])},
-        ...     categorical_mapping={'gender': {'M': 0, 'F': 1}}
-        ... )
+        DataFrame encodé
     """
     df = df.copy()
-
-    # Validation des inputs
     if interval_cols is None:
         interval_cols = {}
     if categorical_mapping is None:
         categorical_mapping = {}
 
-    # Encodage des variables catégorielles
+    # 1. Encodage personnalisé
     for col, mapping in categorical_mapping.items():
         if col in df.columns:
-            # Vérification des catégories manquantes
-            unknown_cats = set(df[col].unique()) - set(mapping.keys())
+            unknown_cats = set(df[col].dropna().unique()) - set(mapping.keys())
             if unknown_cats:
                 raise ValueError(f"Catégories non mappées dans {col}: {unknown_cats}")
-            
             df[col] = df[col].map(mapping)
-            # Conversion en type catégoriel si valeurs sont discrètes
-            if all(isinstance(v, (int, float)) for v in mapping.values()):
-               pd.to_numeric(df[col], errors='ignore')
-    # Découpage en intervalles pour les variables numériques
+
+    # 2. Encodage automatique des colonnes non mappées
+    remaining_cat_cols = df.select_dtypes(include=['object', 'category']).columns
+    auto_encode_cols = [col for col in remaining_cat_cols if col not in categorical_mapping]
+
+    if encoding_strategy == 'onehot':
+        if auto_encode_cols:
+            encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
+            encoded = encoder.fit_transform(df[auto_encode_cols])
+            encoded_df = pd.DataFrame(
+                encoded,
+                columns=encoder.get_feature_names_out(auto_encode_cols),
+                index=df.index
+            )
+            df = df.drop(columns=auto_encode_cols)
+            df = pd.concat([df, encoded_df], axis=1)
+
+    elif encoding_strategy in ('label', 'ordinal'):
+        for col in auto_encode_cols:
+            df[col] = df[col].astype('category').cat.codes
+
+    elif encoding_strategy != 'none':
+        raise ValueError(f"Méthode d'encodage inconnue: {encoding_strategy}")
+
+    # 3. Discrétisation (binning) des colonnes numériques
     for col, (bins, labels) in interval_cols.items():
         if col in df.columns:
             if len(bins) != len(labels) + 1:
                 raise ValueError(f"Nombre de labels incorrect pour {col}. Attendu: {len(bins)-1}, Reçu: {len(labels)}")
-            
-            try:
-                df[col] = pd.cut(df[col], 
-                                bins=bins, 
-                                labels=labels, 
-                                right=False, 
-                                include_lowest=True)
-            except Exception as e:
-                raise ValueError(f"Erreur lors du découpage de {col}: {str(e)}")
+            df[col] = pd.cut(df[col], bins=bins, labels=labels, right=False, include_lowest=True)
 
     return df
-
-
-
-
-
-from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 
 def normalize_data(df, columns=None, method='standard'):
     """
@@ -145,45 +135,73 @@ def normalize_data(df, columns=None, method='standard'):
     return df
 
 
+from typing import List, Optional, Union
+import pandas as pd
+from sklearn.feature_selection import (
+    SelectKBest, SelectPercentile,
+    f_classif, f_regression,
+    mutual_info_classif, mutual_info_regression
+)
 
-from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif, RFE
-from sklearn.ensemble import RandomForestClassifier
-
-def select_features(df, target_col=None, method='kbest', k=5, estimator=None):
-    from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif, RFE
-    from sklearn.ensemble import RandomForestClassifier
-
-    if target_col and target_col not in df.columns:
-        raise ValueError(f"La colonne cible {target_col} n'existe pas")
+def select_features(
+    df: pd.DataFrame,
+    target_col: str,
+    method: str = 'kbest',
+    k: int = 5,
+    percentile: int = 20,
+    custom_features: Optional[List[str]] = None
+) -> pd.DataFrame:
+    """
+    Sélectionne les meilleures features selon la méthode spécifiée.
     
-    if method not in ['kbest', 'mutual_info', 'rfe']:
-        raise ValueError("Méthode non supportée. Choisir: 'kbest', 'mutual_info', 'rfe'")
+    Args:
+        df: DataFrame d'entrée
+        target_col: Nom de la variable cible
+        method: 'kbest', 'percentile', 'mutual_info', ou 'custom'
+        k: Nombre de features à sélectionner (pour kbest)
+        percentile: Pourcentage de features à garder (pour percentile)
+        custom_features: Liste de features à garder (pour méthode 'custom')
     
-    if target_col:
-        X = df.drop(columns=[target_col])
-        y = df[target_col]
+    Returns:
+        DataFrame avec les variables sélectionnées + la colonne cible
+    """
+    if target_col not in df.columns:
+        raise ValueError(f"La colonne cible '{target_col}' n'existe pas.")
+
+    df = df.copy()
+    X = df.drop(columns=[target_col])
+    y = df[target_col]
+
+    if method == 'custom':
+        if not custom_features:
+            raise ValueError("Veuillez spécifier les features pour la méthode personnalisée.")
+        missing = [col for col in custom_features if col not in X.columns]
+        if missing:
+            raise ValueError(f"Les colonnes suivantes sont absentes : {missing}")
+        return df[custom_features + [target_col]]
+
+    # Détermination du type de problème
+    if y.dtype == 'object' or str(y.dtype).startswith("category"):
+        y = y.astype('category').cat.codes
+        score_func = f_classif
+        mutual_func = mutual_info_classif
     else:
-        X = df.copy()
-        y = None
-    
+        score_func = f_regression
+        mutual_func = mutual_info_regression
+
     if method == 'kbest':
-        selector = SelectKBest(f_classif, k=min(k, X.shape[1]))
+        selector = SelectKBest(score_func=score_func, k=min(k, X.shape[1]))
+    elif method == 'percentile':
+        selector = SelectPercentile(score_func=score_func, percentile=percentile)
     elif method == 'mutual_info':
-        selector = SelectKBest(mutual_info_classif, k=min(k, X.shape[1]))
-    elif method == 'rfe':
-        estimator = estimator or RandomForestClassifier()
-        selector = RFE(estimator, n_features_to_select=min(k, X.shape[1]))
-    
-    if y is not None:
-        selector.fit(X, y)
-        selected_cols = X.columns[selector.get_support()]
-        selected_df = X[selected_cols].copy()
-        selected_df[target_col] = y.values  # pour éviter le warning SettingWithCopy
+        selector = SelectKBest(score_func=mutual_func, k=min(k, X.shape[1]))
     else:
-        selected_cols = X.columns[:k]
-        selected_df = X[selected_cols].copy()
-    
-    return selected_df
+        raise ValueError(f"Méthode inconnue: {method}. Choisir parmi 'kbest', 'percentile', 'mutual_info', 'custom'.")
+
+    X_selected = selector.fit_transform(X, y)
+    selected_features = X.columns[selector.get_support()]
+    return df[selected_features.tolist() + [target_col]]
+
 
 
 

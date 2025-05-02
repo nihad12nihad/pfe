@@ -12,15 +12,16 @@ def upload_file(file):
     if ext not in supported_ext:
         return None, f"Erreur : Format '{ext}' non supporté. Formats acceptés : CSV, XLSX, TXT, JSON."
 
-    # 3. Sauvegarder le fichier
-    upload_dir = "uploads"
-    os.makedirs(upload_dir, exist_ok=True)
+    # 3. Sauvegarder le fichier dans le répertoire 'data/raw/'
+    upload_dir = os.path.join(os.path.dirname(__file__), 'data', 'raw')  # Chemin relatif vers 'data/raw'
+    os.makedirs(upload_dir, exist_ok=True)  # Crée le dossier si il n'existe pas
     filepath = os.path.join(upload_dir, filename)
     file.save(filepath)
 
     try:
         # 4. Traitement selon le type de fichier
         if ext == '.csv':
+            # Si le fichier est déjà CSV, on le retourne sans modification
             return filepath, None
 
         elif ext == '.xlsx':
@@ -36,11 +37,11 @@ def upload_file(file):
             df = pd.read_json(filepath)
 
         # 5. Conversion en CSV
-        csv_path = filepath.rsplit('.', 1)[0] + ".csv"
-        df.to_csv(csv_path, index=False)
-        os.remove(filepath)  # Supprimer l'original
-        return csv_path, None
+        csv_path = filepath.rsplit('.', 1)[0] + ".csv"  # Créer un chemin avec l'extension .csv
+        df.to_csv(csv_path, index=False)  # Sauvegarde en CSV
+
+        # Ne pas supprimer le fichier original, il est conservé dans 'data/raw/'
+        return csv_path, None  # Retourner le chemin du fichier CSV
 
     except Exception as e:
-        os.remove(filepath)
         return None, f"Erreur lors de la conversion : {str(e)}"
