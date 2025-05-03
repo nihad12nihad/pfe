@@ -1,47 +1,93 @@
 import os
+from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi.responses import JSONResponse
 import pandas as pd
 from werkzeug.utils import secure_filename
+from typing import Tuple, Optional
+from pathlib import Path
 
-def upload_file(file):
-    # 1. Sécuriser et récupérer le nom du fichier
-    filename = secure_filename(file.filename)
-    ext = os.path.splitext(filename)[1].lower()
+router = APIRouter()
+# Configuration
+UPLOAD_DIR = "backend/app/data/raw"  # Chemin relatif depuis la racine du projet
+ALLOWED_EXTENSIONS = {'.csv', '.xlsx', '.xls', '.txt', '.json'}
+Path(UPLOAD_DIR).mkdir(parents=True, exist_ok=True)  # Crée le dossier si inexistant
 
-    # 2. Vérifier les extensions supportées
-    supported_ext = ['.csv', '.xlsx', '.txt', '.json']
-    if ext not in supported_ext:
-        return None, f"Erreur : Format '{ext}' non supporté. Formats acceptés : CSV, XLSX, TXT, JSON."
-
-    # 3. Sauvegarder le fichier dans le répertoire 'data/raw/'
-    upload_dir = os.path.join(os.path.dirname(__file__), 'data', 'raw')  # Chemin relatif vers 'data/raw'
-    os.makedirs(upload_dir, exist_ok=True)  # Crée le dossier si il n'existe pas
-    filepath = os.path.join(upload_dir, filename)
-    file.save(filepath)
-
+def _save_uploaded_file(file: UploadFile) -> Tuple[Optional[str], Optional[str]]:
+    """Sauvegarde le fichier uploadé et retourne son chemin"""
     try:
-        # 4. Traitement selon le type de fichier
+        filename = secure_filename(file.filename)
+        if not filename:
+            return None, "Nom de fichier invalide"
+        
+        ext = Path(filename).suffix.lower()
+        if ext not in ALLOWED_EXTENSIONS:
+            return None, f"Format {ext} non supporté. Formats autorisés: {', '.join(ALLOWED_EXTENSIONS)}"
+        
+        filepath = os.path.join(UPLOAD_DIR, filename)
+        
+        # Sauvegarde du fichier
+        with open(filepath, "wb") as buffer:
+            buffer.write(file.file.read())
+            
+        return filepath, None
+        
+    except Exception as e:
+        return None, f"Erreur lors de l'enregistrement: {str(e)}"
+
+def _convert_to_csv(filepath: str) -> Tuple[Optional[str], Optional[str]]:
+    """Convertit le fichier en CSV si nécessaire"""
+    try:
+        ext = Path(filepath).suffix.lower()
+        
         if ext == '.csv':
-            # Si le fichier est déjà CSV, on le retourne sans modification
-            return filepath, None
-
-        elif ext == '.xlsx':
+            return filepath, None  # Pas de conversion nécessaire
+            
+        # Lecture selon le format
+        if ext in ('.xlsx', '.xls'):
             df = pd.read_excel(filepath)
-
         elif ext == '.txt':
+            # Essaye plusieurs séparateurs courants
             try:
-                df = pd.read_csv(filepath, sep='\t')  # d'abord tabulation
+                df = pd.read_csv(filepath, sep=None, engine='python')  # Auto-détection
             except:
-                df = pd.read_csv(filepath, sep=',')  # sinon virgule
-
+                return None, "Impossible de déterminer le séparateur du fichier TXT"
         elif ext == '.json':
             df = pd.read_json(filepath)
-
-        # 5. Conversion en CSV
-        csv_path = filepath.rsplit('.', 1)[0] + ".csv"  # Créer un chemin avec l'extension .csv
-        df.to_csv(csv_path, index=False)  # Sauvegarde en CSV
-
-        # Ne pas supprimer le fichier original, il est conservé dans 'data/raw/'
-        return csv_path, None  # Retourner le chemin du fichier CSV
-
+        else:
+            return None, "Format non implémenté pour la conversion"
+        
+        # Conversion en CSV
+        csv_path = f"{os.path.splitext(filepath)[0]}.csv"
+        df.to_csv(csv_path, index=False)
+        
+        return csv_path, None
+        
     except Exception as e:
-        return None, f"Erreur lors de la conversion : {str(e)}"
+        return None, f"Erreur de conversion: {str(e)}"
+
+@router.post("/upload", response_class=JSONResponse)
+async def upload_file(file: UploadFile = File(...)):
+    """
+    Endpoint pour uploader et convertir des fichiers de données
+    Formats supportés: CSV, Excel (XLSX/XLS), TXT, JSON
+    """
+    # 1. Sauvegarde du fichier original
+    saved_path, error = _save_uploaded_file(file)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    
+    # 2. Conversion en CSV si nécessaire
+    csv_path, error = _convert_to_csv(saved_path)
+    if error:
+        # Supprime le fichier original en cas d'échec
+        if os.path.exists(saved_path):
+            os.remove(saved_path)
+        raise HTTPException(status_code=400, detail=error)
+    
+    # 3. Réponse
+    return {
+        "status": "success",
+        "original_path": saved_path,
+        "csv_path": csv_path if csv_path != saved_path else None,
+        "message": "Fichier traité avec succès"
+    }

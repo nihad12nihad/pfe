@@ -1,20 +1,28 @@
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-from app.api import preprocess_routes  # Correct
-from app.api import visualisation_routes  # Utilisation de l'import relatif
+from app.api import (
+    analyze_routes,
+    compare_routes,
+    export_routes,
+    upload_routes,
+    preprocess_routes
+)
+
+app = FastAPI(
+    title="Data Mining Platform",
+    description="Plateforme d'analyse de données",
+    version="1.0"
+)
 
 
+# Inclure les routes
+app.include_router(analyze_routes.router)
+app.include_router(compare_routes.router)
+app.include_router(export_routes.router)
+app.include_router(upload_routes.router)
+app.include_router(preprocess_routes.router)
 
-# Création de l'application FastAPI
-app = FastAPI()
 
-# Inclure les routes de prétraitement
-app.include_router(preprocess_routes.router, prefix="/api")
-
-# Montée du dossier static pour que FastAPI puisse y accéder et servir les fichiers
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# Ajout des routes définies dans visualisation_routes.py
-app.include_router(vis_router)
-
+@app.get("/")
+def read_root():
+    return {"message": "Bienvenue sur la plateforme de data mining"}
 
