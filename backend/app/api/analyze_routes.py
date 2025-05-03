@@ -63,7 +63,7 @@ def generate_visualizations(result: dict, algorithm_name: str) -> Dict[str, str]
     """Appelle les fonctions de visualisation appropriées"""
     vis_paths = {}
     
-    # Visualisation des métriques principales
+    # Visualisation des métriques  principales
     if 'metrics' in result:
         if 'accuracy' in result['metrics']:  # Classification
             vis_paths['metrics'] = plot_classification_results(
