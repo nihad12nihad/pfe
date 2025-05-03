@@ -1,96 +1,121 @@
-import matplotlib
-matplotlib.use('Agg')
+#core/visualization/charts.py
 import matplotlib.pyplot as plt
 import seaborn as sns
-from pathlib import Path
-from typing import Optional, Tuple
 import numpy as np
 import pandas as pd
+import uuid
+import os
+from sklearn.metrics import confusion_matrix, roc_curve, auc
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.metrics import r2_score
+from sklearn.preprocessing import LabelEncoder
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn.tree import DecisionTreeClassifier
 
-class ChartGenerator:
-    """Classe principale pour la génération de graphiques standards"""
-    
-    def __init__(self, output_base_dir: str = "resultats"):
-        self.output_base_dir = Path(output_base_dir)
-        self.output_base_dir.mkdir(parents=True, exist_ok=True)
-        
-    def _prepare_figure(self, figsize: Tuple[int, int] = (10, 6)) -> plt.Figure:
-        """Initialise une figure avec des paramètres par défaut"""
-        plt.style.use('seaborn-v0_8')
-        fig, ax = plt.subplots(figsize=figsize)
-        return fig, ax
-    
-    def _save_figure(self, fig: plt.Figure, filename: str, subfolder: Optional[str] = None) -> str:
-        """Sauvegarde standardisée des figures"""
-        output_dir = self.output_base_dir / subfolder if subfolder else self.output_base_dir
-        output_dir.mkdir(exist_ok=True)
-        
-        filepath = output_dir / f"{filename}.png"
-        fig.savefig(filepath, bbox_inches='tight', dpi=120)
-        plt.close(fig)
-        return str(filepath)
-    
-    def _apply_common_styling(self, ax, title: str, xlabel: str, ylabel: str):
-        """Applique un style cohérent à tous les graphiques"""
-        ax.set_title(title, pad=15)
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
-        ax.grid(alpha=0.3)
-        if hasattr(ax, 'set_facecolor'):
-            ax.set_facecolor('#f5f5f5')
-        plt.tight_layout()
+# Constantes
+OUTPUT_DIR = "app/data/resultats"  # Répertoire de sortie
 
-    def create_barplot(self, data: pd.Series, title: str, xlabel: str, ylabel: str) -> str:
-        """Génère un barplot standard"""
-        fig, ax = self._prepare_figure()
-        sns.barplot(x=data.values, y=data.index, ax=ax, palette='viridis')
-        self._apply_common_styling(ax, title, xlabel, ylabel)
-        filename = f"barplot_{title.replace(' ', '_').lower()}"
-        return self._save_figure(fig, filename)
+# Fonction pour sauvegarder les graphiques
+def save_plot(fig, name_prefix):
+    filename = f"{name_prefix}_{uuid.uuid4().hex[:8]}.png"
+    filepath = os.path.join(OUTPUT_DIR, filename)
+    fig, ax = plt.subplots()  
+    fig.savefig(filepath, bbox_inches='tight')
+    plt.close(fig)
+    return filepath
 
-    def create_histogram(self, data: pd.Series, title: str, xlabel: str, bins: int = 30) -> str:
-        """Génère un histogramme avec courbe KDE"""
-        fig, ax = self._prepare_figure()
-        sns.histplot(data, bins=bins, kde=True, color='skyblue', ax=ax)
-        self._apply_common_styling(ax, title, xlabel, "Fréquence")
-        filename = f"hist_{xlabel.replace(' ', '_').lower()}"
-        return self._save_figure(fig, filename)
+# --- Visualisation des résultats des modèles ---
+def plot_confusion_matrix(df, y_true, y_pred):
+    """ Trace une matrice de confusion pour les modèles de classification. """
+    cm = confusion_matrix(y_true, y_pred)
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=df.columns, yticklabels=df.columns)
+    plt.title('Matrice de confusion')
+    plt.xlabel('Prédictions')
+    plt.ylabel('Réel')
+    image_path = "app/data/resultats/images/confusion_matrix.png"
+    plt.savefig(image_path)
+    plt.close()
+    return image_path
 
-    def create_boxplot(self, data: pd.Series, title: str, xlabel: str) -> str:
-        """Génère un boxplot standard"""
-        fig, ax = self._prepare_figure((8, 6))
-        sns.boxplot(x=data, color='lightcoral', ax=ax)
-        self._apply_common_styling(ax, title, xlabel, "Valeurs")
-        filename = f"boxplot_{xlabel.replace(' ', '_').lower()}"
-        return self._save_figure(fig, filename)
+def plot_classification_results(y_true, y_pred, y_score):
+    """ Trace les résultats de classification : courbe ROC et Bar plot des scores. """
+    # Matrice de confusion
+    cm = confusion_matrix(y_true, y_pred)
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+    plt.title('Matrice de confusion')
+    image_path_cm = "app/data/resultats/images/confusion_matrix.png"
+    plt.savefig(image_path_cm)
+    plt.close()
 
-    def create_heatmap(self, matrix: pd.DataFrame, title: str, fmt: str = ".2f") -> str:
-        """Génère une heatmap pour les matrices de corrélation/confusion"""
-        fig, ax = self._prepare_figure((10, 8))
-        sns.heatmap(matrix, annot=True, cmap='coolwarm', fmt=fmt, square=True, ax=ax)
-        self._apply_common_styling(ax, title, "", "")
-        filename = f"heatmap_{title.replace(' ', '_').lower()}"
-        return self._save_figure(fig, filename)
+    # Courbe ROC
+    fpr, tpr, thresholds = roc_curve(y_true, y_score)
+    roc_auc = auc(fpr, tpr)
+    plt.figure(figsize=(8, 6))
+    plt.plot(fpr, tpr, color='blue', label=f'Courbe ROC (AUC = {roc_auc:.2f})')
+    plt.plot([0, 1], [0, 1], color='gray', linestyle='--')
+    plt.title('Courbe ROC')
+    plt.xlabel('Taux de faux positifs')
+    plt.ylabel('Taux de vrais positifs')
+    plt.legend(loc='lower right')
+    image_path_roc = "app/data/resultats/images/roc_curve.png"
+    plt.savefig(image_path_roc)
+    plt.close()
 
-    def create_scatterplot(self, df: pd.DataFrame, x_col: str, y_col: str, title: str) -> str:
-        """Génère un scatter plot avec droite de régression"""
-        fig, ax = self._prepare_figure()
-        sns.regplot(x=x_col, y=y_col, data=df, 
-                   scatter_kws={"color": "blue"}, 
-                   line_kws={"color": "red"},
-                   ax=ax)
-        self._apply_common_styling(ax, title, x_col, y_col)
-        filename = f"scatter_{x_col}_{y_col}"
-        return self._save_figure(fig, filename)
+    return image_path_cm, image_path_roc
 
-    def create_countplot(self, df: pd.DataFrame, column: str, title: str) -> str:
-        """Génère un countplot pour variables catégorielles"""
-        fig, ax = self._prepare_figure()
-        sns.countplot(x=column, data=df, palette='muted', ax=ax)
-        self._apply_common_styling(ax, title, column, "Count")
-        plt.xticks(rotation=45)
-        filename = f"countplot_{column}"
-        return self._save_figure(fig, filename)
+def plot_regression_results(y_true, y_pred):
+    """ Trace les résultats de régression : courbe des résidus et vraie vs prédite. """
+    # Résidus
+    residuals = y_true - y_pred
+    plt.figure(figsize=(8, 6))
+    sns.scatterplot(x=y_pred, y=residuals)
+    plt.axhline(0, color='gray', linestyle='--')
+    plt.title('Résidus de la régression')
+    plt.xlabel('Prédictions')
+    plt.ylabel('Résidus')
+    image_path_residuals = "sapp/data/resultats/images/residuals.png"
+    plt.savefig(image_path_residuals)
+    plt.close()
 
-# Instance globale pour une utilisation facile
-chart = ChartGenerator()
+    # Vraies vs Prédites
+    plt.figure(figsize=(8, 6))
+    sns.scatterplot(x=y_true, y=y_pred)
+    plt.plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], 'k--', lw=2)
+    plt.title('Vraies valeurs vs Prédites')
+    plt.xlabel('Vraies valeurs')
+    plt.ylabel('Prédites')
+    image_path_true_vs_pred = "sapp/data/resultats/images/true_vs_pred.png"
+    plt.savefig(image_path_true_vs_pred)
+    plt.close()
+
+    return image_path_residuals, image_path_true_vs_pred
+
+def plot_clustering_results(df, n_clusters=3):
+    """ Trace les résultats du clustering (ici avec KMeans). """
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    df['Cluster'] = kmeans.fit_predict(df)
+
+    plt.figure(figsize=(8, 6))
+    sns.scatterplot(x=df.iloc[:, 0], y=df.iloc[:, 1], hue='Cluster', palette='Set1', data=df)
+    plt.title('Visualisation des clusters')
+    image_path_clusters = "app/data/resultats/images/clusters.png"
+    plt.savefig(image_path_clusters)
+    plt.close()
+
+    return image_path_clusters
+
+def plot_association_rules(df):
+    """ Trace un graphique des règles d'association (ex. avec réseau de règles). """
+    # Cette fonction nécessiterait un peu plus de logique pour exploiter un algorithme comme Apriori
+    # Pour cet exemple, je vais simplement tracer un réseau fictif.
+    plt.figure(figsize=(8, 6))
+    # Vous pouvez adapter ici pour intégrer des visualisations plus complexes de règles
+    plt.title('Règles d\'association (exemple)')
+    image_path_association = "app/data/resultats/images/association_rules.png"
+    plt.savefig(image_path_association)
+    plt.close()
+
+    return image_path_association

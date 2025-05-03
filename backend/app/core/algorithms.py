@@ -3,7 +3,7 @@ from typing import Dict, Any
 import pandas as pd
 from pathlib import Path
 import logging
-
+import inspect
 # Importez tous vos algorithmes comme avant
 from app.ml.classification import knn, decision_tree, naive_bayes, neural_network, random_forest, svm
 from app.ml.regression import linear_regression, multiple_regression
@@ -40,24 +40,31 @@ def standardized_wrapper(algo_func):
     def wrapper(data_path: str, target_column: str = None, **params):
         try:
             # 1. Chargement des données
+            logger.info(f"Chargement des données depuis {data_path}")
             data = pd.read_csv(data_path)
-            if target_column:
+
+            # 2. Déterminer les paramètres de la fonction
+            signature = inspect.signature(algo_func)
+            accepts_y = 'y' in signature.parameters
+
+            if target_column and accepts_y:
+                if target_column not in data.columns:
+                    raise ValueError(f"Colonne cible '{target_column}' non trouvée dans le fichier.")
                 X = data.drop(columns=[target_column])
                 y = data[target_column]
+                raw_result = algo_func(X, y, **params)
             else:
-                X = data
-                y = None
-            
-            # 2. Exécution de l'algorithme
-            raw_result = algo_func(X, y, **params) if y is not None else algo_func(X, **params)
-            
+                X = data.drop(columns=[target_column]) if target_column and target_column in data.columns else data
+                raw_result = algo_func(X, **params)
+
             # 3. Standardisation des résultats
+            logger.info("Standardisation des résultats")
             return standardize_output(raw_result, algo_func.__module__)
-            
+
         except Exception as e:
             logger.error(f"Erreur dans l'algorithme: {str(e)}", exc_info=True)
             raise RuntimeError(f"Erreur d'exécution: {str(e)}")
-    
+
     return wrapper
 
 def standardize_output(raw_result: Dict[str, Any], algo_module: str) -> Dict[str, Any]:
@@ -84,6 +91,11 @@ def standardize_output(raw_result: Dict[str, Any], algo_module: str) -> Dict[str
         standardized.update({
             'cluster_labels': raw_result.get('cluster_labels', []),
             'centers': raw_result.get('centers', [])
+        })
+    elif 'association' in algo_module:
+        standardized.update({
+            'frequent_itemsets': raw_result.get('frequent_itemsets', {}),
+            'association_rules': raw_result.get('association_rules', [])
         })
     
     return standardized

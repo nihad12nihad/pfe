@@ -13,6 +13,7 @@ from sklearn.preprocessing import LabelEncoder
 from pathlib import Path
 import json
 import logging
+from typing import Dict, Any, Union, Optional
 
 logging.basicConfig(level=logging.INFO)
 
@@ -92,7 +93,7 @@ class NeuralNetworkModel:
         except Exception as e:
             return {"error": str(e), "status": "failed"}
 
-    def save_results(self, output_path="results/neural_network_results.json"):
+    def save_results(self, output_path="app/data/resultats/neural_network_results.json"):
         """Sauvegarde des résultats au format JSON."""
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, "w") as f:
@@ -110,7 +111,68 @@ class NeuralNetworkModel:
         except Exception as e:
             raise ValueError(f"Erreur lors de la prédiction : {str(e)}")
 
-def run(data_path, target_column, test_size=0.2):
-    nn_model = NeuralNetworkModel()
-    results = nn_model.train(data_path, target_column, test_size)
-    return results
+def run(
+    X: pd.DataFrame,
+    y: pd.Series,
+    test_size: float = 0.2,
+    random_state: int = 42,
+    **kwargs
+) -> Dict[str, Any]:
+    """
+    Entraîne un MLPClassifier et retourne un dict standardisé.
+    
+    X : DataFrame des features  
+    y : Series de la cible (objet ou numérique)  
+    kwargs : paramètres additionnels pour MLPClassifier  
+    """
+    try:
+        # 1) Préparer y_enc sans modifier y original
+        label_encoder = LabelEncoder()
+        if y.dtype == 'object' or str(y.dtype).startswith('category'):
+            y_enc = label_encoder.fit_transform(y)
+            class_labels = list(label_encoder.classes_)
+        else:
+            y_enc = y.values
+            class_labels = list(np.unique(y_enc))
+
+        # 2) Convertir X en array et split
+        X_arr = X.values
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_arr, y_enc, test_size=test_size, random_state=random_state
+        )
+
+        # 3) Créer et entraîner le modèle
+        model = MLPClassifier(random_state=random_state, **kwargs)
+        model.fit(X_train, y_train)
+
+        # 4) Prédire
+        y_pred_enc = model.predict(X_test)
+
+        # 5) Calcul des métriques
+        metrics = {
+            "accuracy": accuracy_score(y_test, y_pred_enc),
+            "precision": precision_score(y_test, y_pred_enc, average="weighted", zero_division=0),
+            "recall": recall_score(y_test, y_pred_enc, average="weighted", zero_division=0),
+            "f1": f1_score(y_test, y_pred_enc, average="weighted", zero_division=0)
+        }
+
+        # 6) Matrice de confusion
+        cm = confusion_matrix(y_test, y_pred_enc)
+
+        # 7) Restaurer les prédictions en labels originaux
+        if hasattr(label_encoder, "inverse_transform") and (y.dtype == 'object' or str(y.dtype).startswith('category')):
+            y_pred = label_encoder.inverse_transform(y_pred_enc).tolist()
+        else:
+            y_pred = y_pred_enc.tolist()
+
+        return {
+            "metrics": metrics,
+            "confusion_matrix": cm.tolist(),
+            "class_labels": class_labels,
+            "visualization_data": X_test,     # np.ndarray pour les clusters/scatter
+            "predictions": y_pred,
+            "model": "MLPClassifier"
+        }
+
+    except Exception as e:
+        raise RuntimeError(f"Erreur complète dans NeuralNetwork.run : {e}")

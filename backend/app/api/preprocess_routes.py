@@ -1,8 +1,10 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from fastapi.responses import FileResponse
 from typing import List, Dict, Any, Optional
 import pandas as pd
 from datetime import datetime
+from pathlib import Path
 import os
 
 from app.core.preprocessing import (
@@ -15,9 +17,9 @@ from app.core.preprocessing import (
 router = APIRouter()
 
 class PreprocessRequest(BaseModel):
-    data: Optional[List[Dict[str, Any]]] = None  # facultatif si on donne un fichier
-    filename: Optional[str] = None               # nouveau champ pour lire un fichier CSV
-    steps: List[str] = []
+    data: Optional[List[Dict[str, Any]]] = None  # Facultatif si on donne un fichier
+    filename: Optional[str] = None               # Nom du fichier CSV déjà uploadé
+    steps: List[str] = []                        # Étapes à réaliser
 
     # Gestion des valeurs manquantes
     numeric_strategy: Optional[str] = 'mean'
@@ -43,22 +45,36 @@ class PreprocessRequest(BaseModel):
 @router.post("/preprocess")
 async def preprocess_data(request: PreprocessRequest):
     try:
-        # Étape 0 : Chargement des données depuis CSV ou JSON
+        # Étape 0 : Chargement des données
         if request.filename:
-            file_path = os.path.join("data/raw", request.filename)
-            if not os.path.exists(file_path):
+            raw_dir = Path("app/data/raw")
+            file_path = raw_dir / request.filename
+            if not file_path.exists():
                 raise HTTPException(status_code=404, detail=f"Fichier non trouvé : {file_path}")
-            df = pd.read_csv(file_path)
+            ext = file_path.suffix.lower()
+            if ext == '.csv':
+                df = pd.read_csv(file_path)
+            elif ext == '.json':
+                df = pd.read_json(file_path)
+            else:
+                raise HTTPException(status_code=400, detail=f"Format non supporté : {ext}")
         elif request.data:
             df = pd.DataFrame(request.data)
         else:
-            raise HTTPException(status_code=400, detail="Aucune donnée fournie (ni fichier, ni données JSON).")
+            raise HTTPException(status_code=400, detail="Aucune donnée fournie.")
 
-        # Étape 1 : Sélection manuelle si précisé
+        # Étape 1 : Sélection manuelle des colonnes
         if request.selected_columns:
-            df = df[request.selected_columns + ([request.target_col] if request.target_col in df.columns else [])]
+            cols = list(request.selected_columns)
+            if request.target_col in df.columns and request.target_col not in cols:
+                cols.append(request.target_col)
+            df = df[cols]
 
-        # Étape 2 : Gestion des valeurs manquantes
+        # Vérifie que la colonne cible est présente
+        if 'select_features' in request.steps and request.target_col not in df.columns:
+            raise HTTPException(status_code=400, detail=f"La colonne cible '{request.target_col}' est absente des données.")
+
+        # Étape 2 : Valeurs manquantes
         if 'handle_missing_values' in request.steps:
             df = handle_missing_values(
                 df,
@@ -94,16 +110,49 @@ async def preprocess_data(request: PreprocessRequest):
                 custom_features=request.custom_features
             )
 
-        # Étape 6 : Sauvegarde dans data/processed
+        # Étape 6 : Sauvegarde
+        processed_dir = Path("app/data/processed")
+        processed_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_path = f"data/processed/processed_{timestamp}.csv"
+        output_file = f"processed_{timestamp}.csv"
+        output_path = processed_dir / output_file
         df.to_csv(output_path, index=False)
 
         return {
             "status": "success",
+            "message": "Prétraitement terminé avec succès.",
+            "columns": df.columns.tolist(),
             "data": df.to_dict(orient="records"),
-            "file_path": output_path
+            "file_path": str(output_path)
         }
-
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Erreur de prétraitement : {str(e)}")
+
+@router.get("/preprocess/files")
+async def list_processed_files():
+    processed_dir = Path("app/data/processed")
+    if not processed_dir.exists():
+        raise HTTPException(status_code=404, detail="Dossier 'processed' introuvable.")
+    files = [f.name for f in processed_dir.glob("*.csv")]
+    return {"files": files}
+
+@router.get("/preprocess/download/{filename}")
+async def download_processed_file(filename: str):
+    processed_dir = Path("app/data/processed")
+    file_path = processed_dir / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Fichier introuvable.")
+    return FileResponse(path=file_path, filename=filename, media_type="text/csv")
+
+@router.get("/preprocess/preview/{filename}")
+async def preview_processed_file(filename: str, rows: int = 10):
+    file_path = Path("app/data/processed") / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Fichier introuvable.")
+    df = pd.read_csv(file_path)
+    return {
+        "columns": df.columns.tolist(),
+        "preview": df.head(rows).to_dict(orient="records")
+    }

@@ -13,6 +13,7 @@ from sklearn.preprocessing import LabelEncoder
 from pathlib import Path
 import json
 import logging
+from typing import Dict, Any, Union, Optional
 
 logging.basicConfig(level=logging.INFO)
 
@@ -91,7 +92,7 @@ class NaiveBayesModel:
         except Exception as e:
             return {"error": str(e), "status": "failed"}
 
-    def save_results(self, output_path="results/naive_bayes_results.json"):
+    def save_results(self, output_path="app/data/resultats/naive_bayes_results.json"):
         """Sauvegarde les résultats."""
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, "w") as f:
@@ -109,7 +110,43 @@ class NaiveBayesModel:
         except Exception as e:
             raise ValueError(f"Erreur de prédiction : {str(e)}")
 
-def run(data_path, target_column, test_size=0.2, model_type="auto"):
-    nb_model = NaiveBayesModel()
-    results = nb_model.train(data_path, target_column, test_size, model_type)
-    return results
+def run(X: pd.DataFrame, y: pd.Series, model_type: str = "auto", **kwargs) -> Dict[str, Any]:
+    try:
+        # Initialisation et encodage de la cible
+        label_encoder = LabelEncoder()
+        y_encoded = label_encoder.fit_transform(y)
+        class_labels = list(label_encoder.classes_)
+
+        # Détection automatique du type de modèle
+        if model_type == "auto":
+            if all(np.issubdtype(dtype, np.integer) for dtype in X.dtypes):
+                model_type = "multinomial"
+            else:
+                model_type = "gaussian"
+
+        # Choix du modèle
+        model = GaussianNB() if model_type == "gaussian" else MultinomialNB()
+
+        # Split
+        X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, random_state=42)
+
+        # Entraînement
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
+
+        return {
+            "metrics": {
+                "accuracy": accuracy_score(y_test, y_pred),
+                "precision": precision_score(y_test, y_pred, average="weighted", zero_division=0),
+                "recall": recall_score(y_test, y_pred, average="weighted", zero_division=0),
+                "f1": f1_score(y_test, y_pred, average="weighted", zero_division=0)
+            },
+            "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
+            "class_labels": class_labels,
+            "visualization_data": X_test.to_numpy(),
+            "predictions": y_pred.tolist(),
+            "model": f"NaiveBayes_{model_type}"
+        }
+
+    except Exception as e:
+        raise RuntimeError(f"Erreur complète dans NaiveBayes.run : {str(e)}")

@@ -2,6 +2,8 @@ import pandas as pd
 from mlxtend.frequent_patterns import apriori, association_rules
 from pathlib import Path
 import json
+import numpy as np
+
 
 class AprioriAssociation:
     """Classe pour l'algorithme Apriori — Association Rules Mining"""
@@ -24,35 +26,29 @@ class AprioriAssociation:
         else:
             return data
 
-    def train(self, data_path):
+    def train(self, df):
         """
         Entraîne l'algorithme Apriori.
         Args:
-            data_path (str): Chemin vers un fichier CSV transactionnel encodé (0/1 ou booléen).
+            df (pd.DataFrame): Données transactionnelles binaires.
         Returns:
             dict: Résultats avec itemsets fréquents et règles.
         """
         try:
-            df = pd.read_csv(data_path)
-
             if df.empty:
-                raise ValueError("Le fichier CSV est vide.")
+                raise ValueError("Le DataFrame fourni est vide.")
 
-            # Convertir les colonnes en booléens (obligatoire pour mlxtend)
-            for col in df.columns:
-                df[col] = df[col].astype(bool)
+            df = df.astype(bool)
 
-            # Générer les itemsets fréquents
+            # Itemsets fréquents
             frequent_itemsets = apriori(df, min_support=self.min_support, use_colnames=True)
 
-            # Générer les règles d'association
+            # Règles d'association
             rules = association_rules(frequent_itemsets, metric=self.metric, min_threshold=self.min_threshold)
+            rules["antecedents"] = rules["antecedents"].apply(list)
+            rules["consequents"] = rules["consequents"].apply(list)
 
-            # Convertir les frozenset en listes pour le JSON
-            rules["antecedents"] = rules["antecedents"].apply(lambda x: list(x))
-            rules["consequents"] = rules["consequents"].apply(lambda x: list(x))
-
-            # Remplir self.results
+            # Résumé + conversion
             self.results = {
                 "frequent_itemsets": self.convert_frozensets(frequent_itemsets.to_dict(orient="records")),
                 "association_rules": self.convert_frozensets(rules.to_dict(orient="records")),
@@ -67,14 +63,63 @@ class AprioriAssociation:
         except Exception as e:
             return {"error": str(e), "status": "failed"}
 
-    def save_results(self, output_path="results/apriori_results.json"):
+    def save_results(self, output_path="app/data/resultats/apriori_results.json"):
         """Sauvegarde les résultats au format JSON."""
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, "w") as f:
             json.dump(self.results, f, indent=4)
         return output_path
 
+
 def run(data_path, min_support=0.5, metric='lift', min_threshold=1.0):
-    model = AprioriAssociation(min_support=min_support, metric=metric, min_threshold=min_threshold)
-    results = model.train(data_path)
-    return results
+    """
+    Fonction d'exécution pour l'algorithme Apriori.
+    Args:
+        data_path (str | Path | pd.DataFrame): Chemin vers un CSV OU DataFrame déjà chargé.
+    Returns:
+        dict: Résultat formaté comme les autres algorithmes de la plateforme
+    """
+    try:
+        # Charger les données
+        if isinstance(data_path, (str, Path)):
+            if not Path(data_path).is_file():
+                raise FileNotFoundError(f"Le fichier '{data_path}' n'existe pas ou est inaccessible.")
+            df = pd.read_csv(data_path)
+        elif isinstance(data_path, pd.DataFrame):
+            df = data_path
+        else:
+            raise TypeError("data_path doit être un chemin vers un fichier CSV ou un DataFrame")
+
+        # Instancier et entraîner le modèle
+        model = AprioriAssociation(min_support=min_support, metric=metric, min_threshold=min_threshold)
+        result = model.train(df)
+
+        if "error" in result:
+            raise ValueError(result["error"])
+
+        # Sortie harmonisée
+        return {
+            "metrics": {
+                "total_itemsets": result["summary"]["total_itemsets"],
+                "total_rules": result["summary"]["total_rules"]
+            },
+            "confusion_matrix": [],
+            "class_labels": [],
+            "visualization_data": df.values.tolist(),  # visualisation possible
+            "predictions": [],
+            "rules": result["association_rules"],
+            "frequent_itemsets": result["frequent_itemsets"],
+            "model": "Apriori"
+        }
+
+    except Exception as e:
+        return {
+            "error": str(e),
+            "status": "failed",
+            "metrics": {},
+            "confusion_matrix": [],
+            "class_labels": [],
+            "visualization_data": [],
+            "predictions": [],
+            "model": "Apriori"
+        }

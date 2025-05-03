@@ -4,12 +4,14 @@ from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.feature_selection import SelectKBest, f_classif, f_regression
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
-
+from typing import Optional, Dict, Tuple, List, Union
+from sklearn.feature_selection import (
+    SelectKBest, SelectPercentile,
+    f_classif, f_regression,
+    mutual_info_classif, mutual_info_regression
+)
 
 def handle_missing_values(df, numeric_strategy='mean', categorical_strategy='constant'):
-    """
-    Gère les valeurs manquantes dans un DataFrame.
-    """
     df = df.copy()
     numeric_cols = df.select_dtypes(include=np.number).columns
     categorical_cols = df.select_dtypes(exclude=np.number).columns
@@ -28,37 +30,18 @@ def handle_missing_values(df, numeric_strategy='mean', categorical_strategy='con
                                                 columns=categorical_cols, index=df.index)
     return df
 
-import pandas as pd
-from typing import Optional, Dict, Tuple, List, Union
-from sklearn.preprocessing import OneHotEncoder
-
 def encode_data(
     df: pd.DataFrame,
     interval_cols: Optional[Dict[str, Tuple[List[float], List[str]]]] = None,
     categorical_mapping: Optional[Dict[str, Dict[str, Union[int, float]]]] = None,
     encoding_strategy: str = 'onehot'
 ) -> pd.DataFrame:
-    """
-    Encode les variables catégorielles et numériques dans un DataFrame.
-
-    Args:
-        df: DataFrame pandas à encoder
-        interval_cols: Colonnes numériques à discrétiser, format:
-                       {'col_name': ([bornes], [labels])}
-        categorical_mapping: Mapping manuel des colonnes catégorielles
-        encoding_strategy: Méthode d'encodage si pas de mapping fourni :
-                           'onehot', 'label', 'ordinal'
-
-    Returns:
-        DataFrame encodé
-    """
     df = df.copy()
     if interval_cols is None:
         interval_cols = {}
     if categorical_mapping is None:
         categorical_mapping = {}
 
-    # 1. Encodage personnalisé
     for col, mapping in categorical_mapping.items():
         if col in df.columns:
             unknown_cats = set(df[col].dropna().unique()) - set(mapping.keys())
@@ -66,7 +49,6 @@ def encode_data(
                 raise ValueError(f"Catégories non mappées dans {col}: {unknown_cats}")
             df[col] = df[col].map(mapping)
 
-    # 2. Encodage automatique des colonnes non mappées
     remaining_cat_cols = df.select_dtypes(include=['object', 'category']).columns
     auto_encode_cols = [col for col in remaining_cat_cols if col not in categorical_mapping]
 
@@ -89,7 +71,6 @@ def encode_data(
     elif encoding_strategy != 'none':
         raise ValueError(f"Méthode d'encodage inconnue: {encoding_strategy}")
 
-    # 3. Discrétisation (binning) des colonnes numériques
     for col, (bins, labels) in interval_cols.items():
         if col in df.columns:
             if len(bins) != len(labels) + 1:
@@ -99,27 +80,13 @@ def encode_data(
     return df
 
 def normalize_data(df, columns=None, method='standard'):
-    """
-    Normalise les données numériques
-    
-    Args:
-        df: DataFrame pandas
-        columns: Liste des colonnes à normaliser (si None, normalise toutes les numériques)
-        method: 'standard' (Z-score), 'minmax' (0-1), 'robust' (résistant aux outliers)
-    
-    Returns:
-        DataFrame transformé
-    """
     df = df.copy()
-    
-    # Sélection des colonnes numériques
     if columns is None:
         columns = df.select_dtypes(include=['number']).columns.tolist()
-    
+
     if not columns:
         return df
-    
-    # Sélection du scaler
+
     if method == 'standard':
         scaler = StandardScaler()
     elif method == 'minmax':
@@ -128,20 +95,9 @@ def normalize_data(df, columns=None, method='standard'):
         scaler = RobustScaler()
     else:
         raise ValueError(f"Méthode inconnue: {method}. Choisir parmi 'standard', 'minmax', 'robust'")
-    
-    # Normalisation
+
     df[columns] = scaler.fit_transform(df[columns])
-    
     return df
-
-
-from typing import List, Optional, Union
-import pandas as pd
-from sklearn.feature_selection import (
-    SelectKBest, SelectPercentile,
-    f_classif, f_regression,
-    mutual_info_classif, mutual_info_regression
-)
 
 def select_features(
     df: pd.DataFrame,
@@ -151,26 +107,15 @@ def select_features(
     percentile: int = 20,
     custom_features: Optional[List[str]] = None
 ) -> pd.DataFrame:
-    """
-    Sélectionne les meilleures features selon la méthode spécifiée.
-    
-    Args:
-        df: DataFrame d'entrée
-        target_col: Nom de la variable cible
-        method: 'kbest', 'percentile', 'mutual_info', ou 'custom'
-        k: Nombre de features à sélectionner (pour kbest)
-        percentile: Pourcentage de features à garder (pour percentile)
-        custom_features: Liste de features à garder (pour méthode 'custom')
-    
-    Returns:
-        DataFrame avec les variables sélectionnées + la colonne cible
-    """
     if target_col not in df.columns:
-        raise ValueError(f"La colonne cible '{target_col}' n'existe pas.")
+        raise ValueError(f"La colonne cible '{target_col}' n'existe pas dans les données. Veuillez vérifier le nom.")
 
     df = df.copy()
     X = df.drop(columns=[target_col])
     y = df[target_col]
+
+    if X.empty:
+        raise ValueError("Aucune colonne disponible pour la sélection de variables après retrait de la cible.")
 
     if method == 'custom':
         if not custom_features:
@@ -180,7 +125,6 @@ def select_features(
             raise ValueError(f"Les colonnes suivantes sont absentes : {missing}")
         return df[custom_features + [target_col]]
 
-    # Détermination du type de problème
     if y.dtype == 'object' or str(y.dtype).startswith("category"):
         y = y.astype('category').cat.codes
         score_func = f_classif
@@ -198,6 +142,10 @@ def select_features(
     else:
         raise ValueError(f"Méthode inconnue: {method}. Choisir parmi 'kbest', 'percentile', 'mutual_info', 'custom'.")
 
-    X_selected = selector.fit_transform(X, y)
+    try:
+        X_selected = selector.fit_transform(X, y)
+    except Exception as e:
+        raise ValueError(f"Erreur lors de la sélection des variables : {str(e)}")
+
     selected_features = X.columns[selector.get_support()]
     return df[selected_features.tolist() + [target_col]]

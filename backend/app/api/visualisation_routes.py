@@ -6,14 +6,8 @@ from core.visualization.preprocessing import (
     plot_correlation_matrix,
     plot_histogram,
     plot_boxplot,
-    plot_categorical_count,
-    plot_linear_relationship,
     plot_missing_values,
     plot_unique_values
-)
-from core.visualization.results import (
-    plot_confusion_matrix,
-    plot_classification_results
 )
 
 router = APIRouter()
@@ -36,14 +30,9 @@ async def visualisation(
             "correlation": lambda: plot_correlation_matrix(df),
             "histogram": lambda: plot_histogram(df, column),
             "boxplot": lambda: plot_boxplot(df, column),
-            "countplot": lambda: plot_categorical_count(df, column),
-            "linear": lambda: plot_linear_relationship(df, x_col, y_col),
             "missing": lambda: plot_missing_values(df),
             "unique": lambda: plot_unique_values(df),
-            "confusion": lambda: plot_confusion_matrix(...),  # À adapter
-            "classification": lambda: plot_classification_results(...)  # À adapter
         }
-
         if graph_type not in plot_handlers:
             raise HTTPException(400, "Type de graphique non supporté")
 
@@ -56,7 +45,8 @@ async def visualisation(
 
         # Génération du graphique
         image_path = plot_handlers[graph_type]()
-        
+
+        # Retour de l'image générée
         return templates.TemplateResponse("visualisation.html", {
             "request": request,
             "image_path": image_path.replace('backend/', '/')  # Pour le chemin web

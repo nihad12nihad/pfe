@@ -13,6 +13,7 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from pathlib import Path
 import json
 import logging
+from typing import Dict, Any, Union, Optional
 
 # Configuration de base des logs
 logging.basicConfig(
@@ -121,7 +122,7 @@ class KNNModel:
             logging.error(f"Erreur de prédiction : {str(e)}")
             raise ValueError(f"Erreur de prédiction : {str(e)}")
 
-    def save_results(self, output_path="results/knn_results.json"):
+    def save_results(self, output_path="app/data/resultats/knn_results.json"):
         """Sauvegarde les résultats au format JSON"""
         try:
             Path(output_path).parent.mkdir(parents=True, exist_ok=True)
@@ -133,7 +134,67 @@ class KNNModel:
             logging.error(f"Erreur lors de la sauvegarde des résultats : {str(e)}")
             raise ValueError(f"Erreur lors de la sauvegarde des résultats : {str(e)}")
 
-def run(data_path, target_column, n_neighbors=5, weights="uniform", algorithm="auto", test_size=0.2):
-    knn = KNNModel(n_neighbors=n_neighbors, weights=weights, algorithm=algorithm)
-    results = knn.train(data_path, target_column, test_size)
-    return results
+def run(
+    X: pd.DataFrame,
+    y: pd.Series,
+    test_size: float = 0.2,
+    random_state: int = 42,
+    **kwargs
+) -> Dict[str, Any]:
+    """
+    Entraîne un KNeighborsClassifier et renvoie un dict standardisé.
+    X : DataFrame des features
+    y : Series de la cible (objet ou numérique)
+    kwargs : paramètres de KNeighborsClassifier (n_neighbors, weights, algorithm, etc.)
+    """
+    try:
+        # Encodage de y sans modifier l’original
+        label_encoder = LabelEncoder()
+        if y.dtype == 'object' or str(y.dtype).startswith('category'):
+            y_enc = label_encoder.fit_transform(y)
+            class_labels = list(label_encoder.classes_)
+        else:
+            y_enc = y.values
+            class_labels = list(np.unique(y_enc))
+
+        # Split train/test
+        X_arr = X.values
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_arr, y_enc, test_size=test_size, random_state=random_state
+        )
+
+        # Création et entraînement du modèle
+        model = KNeighborsClassifier(**kwargs)
+        model.fit(X_train, y_train)
+
+        # Prédictions encodées
+        y_pred_enc = model.predict(X_test)
+
+        # Calcul des métriques
+        metrics = {
+            "accuracy": accuracy_score(y_test, y_pred_enc),
+            "precision": precision_score(y_test, y_pred_enc, average="weighted", zero_division=0),
+            "recall": recall_score(y_test, y_pred_enc, average="weighted", zero_division=0),
+            "f1": f1_score(y_test, y_pred_enc, average="weighted", zero_division=0)
+        }
+
+        # Matrice de confusion
+        cm = confusion_matrix(y_test, y_pred_enc)
+
+        # Restaurer les prédictions dans l’espace des labels d’origine
+        if hasattr(label_encoder, "inverse_transform") and (y.dtype == 'object' or str(y.dtype).startswith('category')):
+            y_pred = label_encoder.inverse_transform(y_pred_enc).tolist()
+        else:
+            y_pred = y_pred_enc.tolist()
+
+        return {
+            "metrics": metrics,
+            "confusion_matrix": cm.tolist(),
+            "class_labels": class_labels,
+            "visualization_data": X_test,          # déjà un np.ndarray
+            "predictions": y_pred,
+            "model": "KNeighborsClassifier"
+        }
+
+    except Exception as e:
+        raise RuntimeError(f"Erreur complète dans KNN.run : {e}")

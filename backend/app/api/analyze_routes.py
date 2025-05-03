@@ -1,14 +1,22 @@
-# api/analyze_routes.py
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import logging
+
 from app.core.algorithms import get_algorithm
 from app.core.visualization.results import (
-    plot_classification_results,
-    plot_regression_results,  # Supprimez cette ligne si vous ne faites pas de régression
     plot_confusion_matrix,
-    plot_clusters
+    plot_roc_curve,
+    plot_classification_scores,
+    plot_feature_importances,
+    plot_residuals,
+    plot_true_vs_pred,
+    plot_regression_errors,
+    plot_clusters_2d,
+    plot_silhouette,
+    plot_dendrogram,
+    plot_association_rules_graph,
+    display_rules_table
 )
 from app.results.export import export_to_csv, export_to_json, export_to_excel
 
@@ -57,7 +65,8 @@ def analyze(request: AnalyzeRequest):
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         logger.error(f"Erreur serveur: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Erreur lors de l'analyse")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 def generate_visualizations(result: dict, algorithm_name: str) -> Dict[str, str]:
     """Appelle les fonctions de visualisation appropriées"""
@@ -66,34 +75,60 @@ def generate_visualizations(result: dict, algorithm_name: str) -> Dict[str, str]
     # Visualisation des métriques principales
     if 'metrics' in result:
         if 'accuracy' in result['metrics']:  # Classification
-            vis_paths['metrics'] = plot_classification_results(
+            vis_paths['metrics'] = plot_classification_scores(
                 result['metrics'],
                 algorithm_name
             )
+            if 'confusion_matrix' in result:
+                vis_paths['confusion_matrix'] = plot_confusion_matrix(
+                    result['confusion_matrix'],
+                    labels=result.get('class_labels', [])
+                )
+            if 'roc_auc' in result:
+                vis_paths['roc_curve'] = plot_roc_curve(
+                    result['actual'],
+                    result['predictions']
+                )
+
         elif 'r2_score' in result['metrics']:  # Régression
-            vis_paths['metrics'] = plot_regression_results(
+            vis_paths['metrics'] = plot_regression_errors(
                 result['metrics'],
                 algorithm_name
             )
-    
-    # Matrice de confusion pour la classification
-    if 'confusion_matrix' in result:
-        vis_paths['confusion_matrix'] = plot_confusion_matrix(
-            result['confusion_matrix'],
-            labels=result.get('class_labels', [])
+            # ➕ Graphe réel vs prédit
+            vis_paths['actual_vs_pred'] = plot_true_vs_pred(
+                actual=result.get("actual", []),
+                predicted=result.get("predictions", [])
+            )
+
+    # Visualisation des clusters (pour clustering)
+    if 'cluster_labels' in result and 'visualization_data' in result:
+        vis_paths['clusters'] = plot_clusters_2d(
+            result['visualization_data'],
+            result['cluster_labels']
         )
-    
-    # Visualisation des clusters
-    if 'cluster_labels' in result:
-        vis_paths['clusters'] = plot_clusters(
-            result.get('visualization_data', {}),
-            algorithm_name
+        vis_paths['silhouette'] = plot_silhouette(
+            result['visualization_data'],
+            result['cluster_labels']
         )
-    
+        vis_paths['dendrogram'] = plot_dendrogram(
+            result['visualization_data']
+        )
+
+    # Visualisation des règles d'association (si applicable)
+    if 'association_rules' in result:
+        vis_paths['association_graph'] = plot_association_rules_graph(
+            result['association_rules']
+        )
+        vis_paths['association_table'] = display_rules_table(
+            result['association_rules']
+        )
+
     return vis_paths
 
+
 def export_results(metrics: dict, algorithm_name: str, format: str) -> str:
-    """Utilise les fonctions d'export de Personne 3"""
+    """Utilise les fonctions d'export"""
     if format == 'csv':
         return export_to_csv(metrics, f"{algorithm_name}_results")
     elif format == 'json':

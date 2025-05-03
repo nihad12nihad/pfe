@@ -2,7 +2,6 @@
 from fastapi import FastAPI
 from app.api import (
     analyze_routes,
-    compare_routes,
     export_routes,
     upload_routes,
     preprocess_routes
@@ -18,7 +17,6 @@ app = FastAPI(
 
 # Inclure les routes
 app.include_router(analyze_routes.router)
-app.include_router(compare_routes.router)
 app.include_router(export_routes.router)
 app.include_router(upload_routes.router)
 app.include_router(preprocess_routes.router)
