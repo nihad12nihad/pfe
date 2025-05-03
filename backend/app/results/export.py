@@ -13,14 +13,14 @@ def ensure_dir_exists(output_dir: str) -> Path:
     path.mkdir(parents=True, exist_ok=True)  # par nts=True crée toute l'arborescence
     return path
 
-def export_to_csv(data: dict, filename: str, output_dir: str = "backend/data/processed") -> str:
+def export_to_csv(data: dict, filename: str, output_dir: str = "app/data/resultats") -> str:
     """Exporte un dictionnaire en CSV"""
     dir_path = ensure_dir_exists(output_dir)
     filepath = dir_path / f"{filename}.csv"
     pd.DataFrame(data.items(), columns=["Metric", "Value"]).to_csv(filepath, index=False)
     return str(filepath)
 
-def export_to_json(data: dict, filename: str, output_dir: str = "backend/data/processed") -> str:
+def export_to_json(data: dict, filename: str, output_dir: str = "app/data/resultats") -> str:
     """Exporte un dictionnaire en JSON"""
     dir_path = ensure_dir_exists(output_dir)
     filepath = dir_path / f"{filename}.json"
@@ -28,7 +28,7 @@ def export_to_json(data: dict, filename: str, output_dir: str = "backend/data/pr
         json.dump(data, f, indent=4)
     return str(filepath)
 
-def export_to_excel(data: dict, filename: str, output_dir: str = "backend/data/processed") -> str:
+def export_to_excel(data: dict, filename: str, output_dir: str = "app/data/resultats") -> str:
     """Exporte un dictionnaire en Excel"""
     dir_path = ensure_dir_exists(output_dir)
     filepath = dir_path / f"{filename}.xlsx"

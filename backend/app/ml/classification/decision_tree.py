@@ -8,105 +8,255 @@ from sklearn.metrics import (
     recall_score,
     f1_score,
     confusion_matrix,
+    classification_report
 )
 from sklearn.preprocessing import LabelEncoder
 from pathlib import Path
 import json
 import logging
+import pickle
+from typing import Dict, Any, Union, Optional
 
+# Configuration du logging
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class DecisionTreeModel:
-    """Classe Decision Tree avec gestion des erreurs et résultats standardisés."""
+    """Classe Decision Tree avec gestion améliorée des erreurs et résultats standardisés."""
 
-    def __init__(self, criterion="gini", max_depth=None, random_state=42):
+    def __init__(self, criterion: str = "gini", max_depth: Optional[int] = None, random_state: int = 42):
+        """
+        Initialise le modèle Decision Tree.
+        
+        Args:
+            criterion: Mesure de qualité de split ("gini" ou "entropy")
+            max_depth: Profondeur maximale de l'arbre
+            random_state: Seed pour la reproductibilité
+        """
         self.criterion = criterion
         self.max_depth = max_depth
         self.random_state = random_state
-        self.model = None
+        self.model = DecisionTreeClassifier(
+            criterion=self.criterion,
+            max_depth=self.max_depth,
+            random_state=self.random_state
+        )
         self.label_encoder = LabelEncoder()
-        self.results = {}
+        self.results: Dict[str, Any] = {}
+        self.feature_importances_: Optional[np.ndarray] = None
 
-    def load_data(self, data_path, target_column):
-        """Charge et valide les données utilisateur."""
+
+    def load_data(self, data_path: Union[str, Path], target_column: str) -> tuple[pd.DataFrame, pd.Series]:
+        """
+        Charge et valide les données.
+        
+        Args:
+            data_path: Chemin vers le fichier CSV
+            target_column: Nom de la colonne cible
+            
+        Returns:
+        Tuple (features, target)
+            
+        Raises:
+            ValueError: Si les données sont invalides
+        """
         try:
             df = pd.read_csv(data_path)
+            
+            # Validation des données
             if target_column not in df.columns:
-                raise ValueError(f"Colonne cible '{target_column}' introuvable.")
+                raise ValueError(f"Colonne cible '{target_column}' introuvable. Colonnes disponibles: {list(df.columns)}")
             if df.empty:
                 raise ValueError("Le fichier de données est vide.")
-            if len(df) < 10:
-                raise ValueError("Trop peu d'échantillons (min 10 requis).")
-
+            if len(df[target_column].unique()) < 2:
+                raise ValueError("La colonne cible doit avoir au moins 2 classes.")
+            if len(df) < 20:
+                logger.warning("Dataset très petit (moins de 20 échantillons)")
+            
             X = df.drop(columns=[target_column])
             y = self.label_encoder.fit_transform(df[target_column])
+            
             return X, y
-
+            
         except Exception as e:
-            raise ValueError(f"Erreur de chargement des données : {str(e)}")
+            logger.error(f"Erreur de chargement des données: {str(e)}")
+            raise
 
-    def train(self, data_path, target_column, test_size=0.2):
-        """Entraîne et évalue le modèle Decision Tree."""
+    def train(self, data_path: Union[str, Path], target_column: str, test_size: float = 0.2) -> Dict[str, Any]:
+        """
+        Entraîne et évalue le modèle Decision Tree.
+        
+        Args:
+            data_path: Chemin vers les données
+            target_column: Nom de la colonne cible
+            test_size: Proportion des données de test
+            
+        Returns:
+            Dictionnaire de résultats standardisés
+        """
         try:
             X, y = self.load_data(data_path, target_column)
-
             X_train, X_test, y_train, y_test = train_test_split(
                 X, y, test_size=test_size, random_state=self.random_state
             )
-
-            self.model = DecisionTreeClassifier(
-                criterion=self.criterion,
-                max_depth=self.max_depth,
-                random_state=self.random_state
-            )
+            
             self.model.fit(X_train, y_train)
-
             y_pred = self.model.predict(X_test)
-
-            self.results = {
-                "model": "DecisionTree",
-                "parameters": {
-                    "criterion": self.criterion,
-                    "max_depth": self.max_depth,
-                    "test_size": test_size,
-                },
-                "metrics": {
-                    "accuracy": accuracy_score(y_test, y_pred),
-                    "precision": precision_score(y_test, y_pred, average="weighted"),
-                    "recall": recall_score(y_test, y_pred, average="weighted"),
-                    "f1": f1_score(y_test, y_pred, average="weighted"),
-                },
-                "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
-                "class_labels": {
-                    int(i): label for i, label in enumerate(self.label_encoder.classes_)
-                },
+            self.feature_importances_ = self.model.feature_importances_
+            
+            # Calcul des métriques
+            metrics = {
+                'accuracy': accuracy_score(y_test, y_pred),
+                'precision': precision_score(y_test, y_pred, average='weighted'),
+                'recall': recall_score(y_test, y_pred, average='weighted'),
+                'f1': f1_score(y_test, y_pred, average='weighted'),
             }
-            logging.info("Modèle Decision Tree entraîné avec succès.")
+            
+            # Matrice de confusion
+            cm = confusion_matrix(y_test, y_pred)
+            
+            self.results = {
+                'model_type': 'decision_tree',
+                'parameters': {
+                    'criterion': self.criterion,
+                    'max_depth': self.max_depth,
+                    'random_state': self.random_state,
+                },
+                'metrics': metrics,
+                'confusion_matrix': cm.tolist(),
+                'classification_report': classification_report(y_test, y_pred, output_dict=True),
+                'feature_importances': dict(zip(X.columns, self.feature_importances_)),
+                'class_labels': {i: label for i, label in enumerate(self.label_encoder.classes_)},
+            }
+            
+            logger.info("Entraînement terminé avec succès")
             return self.results
-
+            
         except Exception as e:
-            return {"error": str(e), "status": "failed"}
+            logger.error(f"Erreur lors de l'entraînement: {str(e)}")
+            return {'status': 'failed', 'error': str(e)}
 
-    def save_results(self, output_path="results/decision_tree_results.json"):
-        """Sauvegarde les résultats dans un fichier JSON."""
-        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        with open(output_path, "w") as f:
-            json.dump(self.results, f, indent=4)
-        logging.info(f"Résultats sauvegardés dans {output_path}.")
-        return output_path
+    def save_model(self, output_path: Union[str, Path] = None) -> str:
+        """
+        Sauvegarde le modèle entraîné de manière robuste.
+        
+        Args:
+            output_path: Chemin de sauvegarde (optionnel)
+            
+        Returns:
+            Chemin absolu où le modèle a été sauvegardé
+            
+        Raises:
+            ValueError: Si le modèle n'est pas entraîné
+            IOError: Si la sauvegarde échoue
+        """
+        if not hasattr(self.model, 'feature_importances_'):
+            raise ValueError("Le modèle doit être entraîné avant sauvegarde")
 
-    def predict(self, X_new):
-        """Effectue une prédiction sur de nouvelles données."""
-        if self.model is None:
-            raise ValueError("Le modèle n'a pas encore été entraîné.")
+        # Chemin par défaut relatif au fichier courant
+        if output_path is None:
+            output_path = Path(__file__).parent.parent / "data" / "models" / "decision_tree.pkl"
+        
+        output_path = Path(output_path).absolute()
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        try:
+            with open(output_path, 'wb') as f:
+                pickle.dump({
+                    'model': self.model,
+                    'label_encoder': self.label_encoder,
+                    'metadata': {
+                        'criterion': self.criterion,
+                        'max_depth': self.max_depth,
+                        'features': list(self.results.get('feature_importances', {}).keys())
+                    }
+                }, f, protocol=pickle.HIGHEST_PROTOCOL)
+            
+            logger.info(f"Modèle sauvegardé avec succès dans {output_path}")
+            return str(output_path)
+            
+        except Exception as e:
+            logger.error(f"Échec de la sauvegarde du modèle: {str(e)}")
+            raise IOError(f"Impossible de sauvegarder le modèle: {str(e)}")
+
+    def save_results(self, output_path: Union[str, Path] = None) -> str:
+        """
+        Sauvegarde les résultats au format JSON de manière robuste.
+        
+        Args:
+            output_path: Chemin de sauvegarde (optionnel)
+            
+        Returns:
+            Chemin absolu où les résultats ont été sauvegardés
+            
+        Raises:
+            ValueError: Si aucun résultat n'est disponible
+            IOError: Si la sauvegarde échoue
+        """
+        if not self.results:
+            raise ValueError("Aucun résultat à sauvegarder")
+
+        # Chemin par défaut relatif au fichier courant
+        if output_path is None:
+            output_path = Path(__file__).parent.parent / "data" / "resultats" / "decision_tree_results.json"
+        
+        output_path = Path(output_path).absolute()
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        try:
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(self.results, f, 
+                         indent=4, 
+                         ensure_ascii=False,
+                         default=str)  # Pour sérialiser les types non JSON
+            
+            logger.info(f"Résultats sauvegardés avec succès dans {output_path}")
+            return str(output_path)
+            
+        except Exception as e:
+            logger.error(f"Échec de la sauvegarde des résultats: {str(e)}")
+            raise IOError(f"Impossible de sauvegarder les résultats: {str(e)}")
+
+    def predict(self, X_new: pd.DataFrame) -> list:
+        """
+        Effectue des prédictions sur de nouvelles données.
+        
+        Args:
+            X_new: DataFrame contenant les nouvelles données
+            
+        Returns:
+            Liste des prédictions
+            
+        Raises:
+            ValueError: Si le modèle n'est pas entraîné
+        """
+        if not hasattr(self.model, 'feature_importances_'):
+            raise ValueError("Le modèle doit être entraîné avant de faire des prédictions")
         try:
             predictions = self.model.predict(X_new)
             return self.label_encoder.inverse_transform(predictions).tolist()
         except Exception as e:
-            raise ValueError(f"Erreur lors de la prédiction : {str(e)}")
+            logger.error(f"Erreur de prédiction: {str(e)}")
+            raise
 
-def run(data_path, target_column, criterion="gini", max_depth=None, test_size=0.2):
-    dtree = DecisionTreeModel(criterion=criterion, max_depth=max_depth)
-    results = dtree.train(data_path, target_column, test_size)
-    return results
-   
+def run(data_path: str, target_column: str, **kwargs) -> Dict[str, Any]:
+    try:
+        # Convertir en Path absolu
+        data_path = Path(data_path).absolute()
+        logger.info(f"Chemin absolu des données : {data_path}")
+        
+        if not data_path.exists():
+            raise FileNotFoundError(f"Fichier introuvable : {data_path}")
+            
+        model = DecisionTreeModel(**kwargs)
+        results = model.train(str(data_path), target_column)  # Convertir en string pour pandas
+        
+        # Sauvegarde avec chemins absolus
+        model.save_results()
+        model.save_model()
+        
+        return results
+        
+    except Exception as e:
+        logger.error(f"Erreur complète : {str(e)}", exc_info=True)
+        return {'status': 'failed', 'error': str(e)}

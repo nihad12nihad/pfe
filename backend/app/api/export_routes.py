@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Security
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer,HTTPAuthorizationCredentials
-from pydantic import BaseModel, validator, Field
+from pydantic import BaseModel, field_validator ,Field
 from pathlib import Path
 from datetime import datetime
 import logging
@@ -9,8 +9,9 @@ import os
 from typing import Dict,Literal,Optional
 import shutil
 
+
 # Import de vos fonctions existantes
-from results.export import (
+from app.results.export import (
     export_to_csv,
     export_to_json,
     export_to_excel,
@@ -25,16 +26,16 @@ router = APIRouter(
 )
 
 logger = logging.getLogger(__name__)
-EXPORT_DIR = Path("backend/data/processed").resolve()
+EXPORT = Path("backend/app/data/processed").resolve()
 security=HTTPBearer()
 
 class ExportRequest(BaseModel):
     """Modèle de validation pour les exports"""
     metrics: Dict[str, float]
-    filename: str = Field(default_factory=lambda: f"export_{datetime.now().strftime('%Y%m%d_%H%M%S')}",examples="model_metrics",max_length=50)
+    filename: str = Field(default_factory=lambda: f"export_{datetime.now().strftime('%Y%m%d_%H%M%S')}",examples=["model_metrics"],max_length=50)
     format: Literal["csv","json","excel"]="csv"
 
-    @validator('filename')
+    @field_validator('filename')
     def validate_filename(cls, v):
         """Valide que le nom de fichier est sûr"""
         if not all(c.isalnum() or c in {'_', '-'} for c in v):
@@ -55,9 +56,9 @@ class ExportResponse(BaseModel):
 def get_secure_path(filename: str) -> Path:
     """Valide et sécurise le chemin de sortie"""
     clean_name= Path(filename).name
-    path=(EXPORT_DIR / clean_name).resolve()
+    path=(EXPORT / clean_name).resolve()
     
-    if not path.parent.samefile(EXPORT_DIR):
+    if not path.parent.samefile(EXPORT):
         logger.warning(f"Tentative d'accès non sécurisé:{filename}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -67,7 +68,7 @@ def get_secure_path(filename: str) -> Path:
 
 def cleanup_old_exports(max_files: int = 50):
     try:
-        files = sorted(EXPORT_DIR.iterdir(), key=os.path.getmtime)
+        files = sorted(EXPORT.iterdir(), key=os.path.getmtime)
         if len(files) > max_files:
             for old_files in files[:len(files)-max_files]:
                 old_files.unlink()
@@ -75,7 +76,7 @@ def cleanup_old_exports(max_files: int = 50):
         logger.warning(f"echec de nettoyage des exports : {e}")
 
 @router.post(
-    "/{export_format}",
+    "/export",
     response_model=ExportResponse,
     responses={
         201:{"description":"fichier créé","model": ExportResponse},
@@ -113,7 +114,7 @@ async def export_data(
         filepath = exporters[export_format](
             data=request.metrics,
             filename=request.filename,
-            output_dir=str(EXPORT_DIR)  # Respecte votre signature
+            output_dir=str(EXPORT)  # Respecte votre signature
         )
         
         # Vérification que le fichier a bien été créé
@@ -123,8 +124,8 @@ async def export_data(
         cleanup_old_exports()
             
         return ExportResponse(
-            status= "succes",
-            path=str(Path(filepath).relative_to(EXPORT_DIR)),
+            status= "success",
+            path=str(Path(filepath).relative_to(EXPORT)),
             download_url=f"/api/export/download/{safe_filename}",
             size=f"{os.path.getsize(filepath) / 1024:.2f} KB"
         )
