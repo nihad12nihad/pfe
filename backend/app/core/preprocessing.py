@@ -197,18 +197,6 @@ def select_features(
         selector = SelectKBest(score_func=mutual_func, k=min(k, X.shape[1]))
     else:
         raise ValueError(f"Méthode inconnue: {method}. Choisir parmi 'kbest', 'percentile', 'mutual_info', 'custom'.")
-<<<<<<< HEAD
-
-    X_selected = selector.fit_transform(X, y)
-    selected_features = X.columns[selector.get_support()]
-    return df[selected_features.tolist() + [target_col]]
-
-
-
-
-
-=======
->>>>>>> bfe5170 (par Nihadoun (nchlh ymchi khater ni bdit naeya))
 
     X_selected = selector.fit_transform(X, y)
     selected_features = X.columns[selector.get_support()]

@@ -1,3 +1,4 @@
+# backend/main.py
 from fastapi import FastAPI
 from app.api import (
     analyze_routes,
@@ -6,6 +7,7 @@ from app.api import (
     upload_routes,
     preprocess_routes
 )
+
 
 app = FastAPI(
     title="Data Mining Platform",
@@ -25,4 +27,3 @@ app.include_router(preprocess_routes.router)
 @app.get("/")
 def read_root():
     return {"message": "Bienvenue sur la plateforme de data mining"}
-
