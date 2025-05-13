@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Visualisation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 2rem;
+            background-color: #f7f7f7;
+            text-align: center;
+        }
+        img {
+            max-width: 80%;
+            border: 1px solid #ccc;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>Graphique généré</h1>
+    {% if image_path %}
+        <img src="{{ image_path }}" alt="Graphique généré">
+    {% else %}
+        <p>Aucune image à afficher.</p>
+    {% endif %}
+</body>
+</html>

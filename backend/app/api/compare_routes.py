@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 import random
 from pydantic import BaseModel
-from app.results.visualisation import plot_classification_results
+from app.core.visualization.results import plot_classification_results
 from app.results.export import export_to_csv, export_to_excel, export_to_json
 
 router = APIRouter(prefix="/compare", tags=["Algorithm Comparison"])
@@ -55,7 +55,7 @@ async def load_metrics_wrapper(algorithm_name: str) -> Dict[str, float]:
         raise RuntimeError(f"Erreur de chargement : {str(e)}")
 
 @router.post(
-    "/algorithms",
+    "/compare",
     response_model=ComparisonResponse,
     responses={
         200: {"description": "Comparaison réussie"},
