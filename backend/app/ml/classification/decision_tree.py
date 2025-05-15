@@ -133,7 +133,7 @@ class DecisionTreeModel:
 
             logger.info("Entraînement terminé avec succès")
             return self.results
-
+            
         except Exception as e:
             logger.error(f"Erreur lors de l'entraînement: {e}", exc_info=True)
             raise RuntimeError(f"Échec de l'entraînement : {e}")
