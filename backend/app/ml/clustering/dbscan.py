@@ -5,6 +5,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import silhouette_score
 import json
 from pathlib import Path
+from typing import Dict, Any
 
 class DBSCANClustering:
     """Classe pour appliquer DBSCAN Clustering"""
@@ -51,13 +52,54 @@ class DBSCANClustering:
         except Exception as e:
             return {"error": str(e), "status": "failed"}
 
-    def save_results(self, output_path="results/dbscan_results.json"):
+    def save_results(self, output_path="app/data/resultats/dbscan_results.json"):
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, "w") as f:
             json.dump(self.results, f, indent=4)
         return output_path
 
-def run(data_path, eps=0.5, min_samples=5):
-    model = DBSCANClustering(eps=eps, min_samples=min_samples)
-    results = model.train(data_path)
-    return results
+def run(
+    X: pd.DataFrame,
+    eps: float = 0.5,
+    min_samples: int = 5,
+    **kwargs
+) -> Dict[str, Any]:
+    """
+    Applique DBSCAN sur X et renvoie un dict standardisé.
+    
+    X           : DataFrame des features
+    eps         : rayon de voisinage
+    min_samples : nombre minimum de points dans eps‑voisinage
+    kwargs      : paramètres supplémentaires ignorés ici
+    """
+    try:
+        # 1) mettre à l’échelle
+        scaler = StandardScaler()
+        X_arr = X.values  # garantit un numpy.ndarray
+        X_scaled = scaler.fit_transform(X_arr)
+
+        # 2) clustering
+        model = DBSCAN(eps=eps, min_samples=min_samples, **kwargs)
+        labels = model.fit_predict(X_scaled)
+
+        # 3) score de silhouette (–1 si un seul cluster ou tout bruit)
+        unique_labels = set(labels)
+        score = silhouette_score(X_scaled, labels) if len(unique_labels - {-1}) > 1 else -1
+
+        # 4) préparer la visualisation (2D si possible)
+        if X_scaled.shape[1] >= 2:
+            viz = X_scaled[:, :2].tolist()
+        else:
+            viz = X_scaled.tolist()
+
+        return {
+            "metrics": {"silhouette_score": score},
+            "cluster_labels": labels.tolist(),
+            "visualization_data": viz,
+            "model": "DBSCAN",
+            "parameters": {"eps": eps, "min_samples": min_samples}
+        }
+
+    except Exception as e:
+        raise RuntimeError(f"Erreur complète DBSCAN.run : {e}")
+

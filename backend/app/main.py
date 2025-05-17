@@ -2,11 +2,14 @@
 from fastapi import FastAPI
 from app.api import (
     analyze_routes,
-    compare_routes,
     export_routes,
     upload_routes,
-    preprocess_routes
+    preprocess_routes,
+    info_routes,
+    result_visualisation_routes,
+    visualisation_routes
 )
+
 
 app = FastAPI(
     title="Data Mining Platform",
@@ -17,10 +20,12 @@ app = FastAPI(
 
 # Inclure les routes
 app.include_router(analyze_routes.router)
-app.include_router(compare_routes.router)
 app.include_router(export_routes.router)
 app.include_router(upload_routes.router)
 app.include_router(preprocess_routes.router)
+app.include_router(info_routes.router)
+app.include_router(visualisation_routes.router)
+app.include_router(result_visualisation_routes.router)
 
 
 @app.get("/")

@@ -124,7 +124,7 @@ async def export_data(
         cleanup_old_exports()
             
         return ExportResponse(
-            status= "success",
+            status= "succes",
             path=str(Path(filepath).relative_to(EXPORT)),
             download_url=f"/api/export/download/{safe_filename}",
             size=f"{os.path.getsize(filepath) / 1024:.2f} KB"

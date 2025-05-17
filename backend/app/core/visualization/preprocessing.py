@@ -1,77 +1,67 @@
-from .charts import chart
+import os
+import seaborn as sns
+import matplotlib.pyplot as plt
 import pandas as pd
-from typing import Optional
+import numpy as np
+import uuid
 
-def plot_correlation_matrix(df: pd.DataFrame) -> str:
-    """Matrice de corrélation avec heatmap"""
-    numeric_df = df.select_dtypes(include=['number'])
-    if numeric_df.empty:
-        raise ValueError("Aucune colonne numérique pour la matrice de corrélation")
-    return chart.create_heatmap(
-        matrix=numeric_df.corr(),
-        title="Matrice de Corrélation"
-    )
+# Dossier où enregistrer les graphes
+OUTPUT_DIR = "app/data/resultats"
 
-def plot_histogram(df: pd.DataFrame, column: str) -> str:
-    """Histogramme pour une colonne numérique"""
-    if column not in df.columns:
-        raise ValueError(f"Colonne {column} non trouvée")
-    return chart.create_histogram(
-        data=df[column],
-        title=f"Distribution de {column}",
-        xlabel=column
-    )
+# S'assurer que le dossier de résultats existe
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-def plot_boxplot(df: pd.DataFrame, column: str) -> str:
-    """Boxplot pour une colonne numérique"""
-    if column not in df.columns:
-        raise ValueError(f"Colonne {column} non trouvée")
-    return chart.create_boxplot(
-        data=df[column],
-        title=f"Boxplot de {column}",
-        xlabel=column
-    )
+def save_plot(fig, name_prefix):
+    filename = f"{name_prefix}_{uuid.uuid4().hex[:8]}.png"
+    filepath = os.path.join(OUTPUT_DIR, filename)
+    fig, ax = plt.subplots()
+    fig.savefig(filepath, bbox_inches='tight')
+    plt.close(fig)
+    return filepath
 
-def plot_categorical_count(df: pd.DataFrame, column: str) -> str:
-    """Countplot pour une colonne catégorielle"""
-    if column not in df.columns:
-        raise ValueError(f"Colonne {column} non trouvée")
-    return chart.create_countplot(
-        df=df,
-        column=column,
-        title=f"Distribution de {column}"
-    )
+# Visualisation de la matrice de corrélation
+def plot_correlation_matrix(df):
+    # Sélectionner uniquement les colonnes numériques
+    df_numeric = df.select_dtypes(include=[np.number])
+    fig, ax = plt.subplots(figsize=(10, 8))
+    corr = df_numeric.corr()  # Calcul de la corrélation uniquement sur les colonnes numériques
+    sns.heatmap(corr, annot=True, cmap="coolwarm", ax=ax)
+    ax.set_title("Heatmap des corrélations")
+    return save_plot(fig, "correlation_matrix")
 
-def plot_linear_relationship(df: pd.DataFrame, x_col: str, y_col: str) -> str:
-    """Nuage de points avec régression linéaire"""
-    if x_col not in df.columns or y_col not in df.columns:
-        raise ValueError("Colonnes spécifiées non trouvées")
-    return chart.create_scatterplot(
-        df=df,
-        x_col=x_col,
-        y_col=y_col,
-        title=f"Relation entre {x_col} et {y_col}"
-    )
+# Visualisation de l'histogramme pour une colonne
+def plot_histogram(df, column):
+    fig, ax = plt.subplots()
+    sns.histplot(df[column].dropna(), kde=True, ax=ax)  # Utilisation de dropna() pour éviter les valeurs manquantes
+    ax.set_title(f"Histogramme de {column}")
+    return save_plot(fig, "histogram")
 
-def plot_missing_values(df: pd.DataFrame) -> str:
-    """Visualisation des valeurs manquantes"""
-    missing = df.isnull().sum()
+# Visualisation du boxplot pour une colonne
+def plot_boxplot(df, column):
+    fig, ax = plt.subplots()
+    sns.boxplot(y=df[column].dropna(), ax=ax)  # Utilisation de dropna() pour éviter les valeurs manquantes
+    ax.set_title(f"Boxplot de {column}")
+    return save_plot(fig, "boxplot")
+
+# Visualisation de la distribution des valeurs manquantes
+def plot_missing_values(df):
+    fig, ax = plt.subplots(figsize=(10, 6))
+    missing = df.isnull().mean() * 100
     missing = missing[missing > 0].sort_values(ascending=False)
     if missing.empty:
-        raise ValueError("Aucune valeur manquante détectée")
-    return chart.create_barplot(
-        data=missing,
-        title="Valeurs manquantes par colonne",
-        xlabel="Nombre de valeurs manquantes",
-        ylabel="Colonnes"
-    )
+        raise ValueError("Aucune valeur manquante à afficher.")
+    sns.barplot(x=missing.index, y=missing.values, ax=ax)
+    ax.set_ylabel("Pourcentage de valeurs manquantes")
+    plt.xticks(rotation=45)
+    ax.set_title("Valeurs manquantes par colonne")
+    return save_plot(fig, "missing_values")
 
-def plot_unique_values(df: pd.DataFrame) -> str:
-    """Visualisation des valeurs uniques"""
+# Visualisation des valeurs uniques par colonne
+def plot_unique_values(df):
+    fig, ax = plt.subplots(figsize=(10, 6))
     unique_counts = df.nunique().sort_values(ascending=False)
-    return chart.create_barplot(
-        data=unique_counts,
-        title="Valeurs uniques par colonne",
-        xlabel="Nombre de valeurs uniques",
-        ylabel="Colonnes"
-    )
+    sns.barplot(x=unique_counts.index, y=unique_counts.values, ax=ax)
+    ax.set_ylabel("Nombre de valeurs uniques")
+    plt.xticks(rotation=45)
+    ax.set_title("Valeurs uniques par colonne")
+    return save_plot(fig, "unique_values")

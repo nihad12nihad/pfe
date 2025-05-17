@@ -5,6 +5,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import silhouette_score
 import json
 from pathlib import Path
+from typing import Dict, Any
 
 class KMeansClustering:
     """Classe pour appliquer KMeans Clustering avec évaluation"""
@@ -48,13 +49,34 @@ class KMeansClustering:
         except Exception as e:
             return {"error": str(e), "status": "failed"}
 
-    def save_results(self, output_path="results/kmeans_results.json"):
+    def save_results(self, output_path="app/data/resultats/kmeans_results.json"):
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, "w") as f:
             json.dump(self.results, f, indent=4)
         return output_path
     
-def run(data_path, n_clusters=3):
-    model = KMeansClustering(n_clusters=n_clusters)
-    results = model.train(data_path)
-    return results
+def run(X: pd.DataFrame, **kwargs) -> Dict[str, Any]:
+    try:
+        n_clusters = kwargs.get('n_clusters', 3)
+
+        # Assurer qu'il n'y a pas de NaN
+        if X.isnull().any().any():
+            raise ValueError("Les données contiennent des valeurs manquantes.")
+
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+
+        model = KMeans(n_clusters=n_clusters, random_state=42)
+        labels = model.fit_predict(X_scaled)
+        score = silhouette_score(X_scaled, labels) if len(set(labels)) > 1 else -1
+
+        return {
+            'metrics': {'silhouette_score': score},
+            'cluster_labels': labels.tolist(),
+            'visualization_data': X_scaled[:, :2].tolist() if X_scaled.shape[1] >= 2 else X_scaled.tolist(),
+            'model': 'KMeans',
+            'parameters': {'n_clusters': n_clusters}
+        }
+
+    except Exception as e:
+        raise RuntimeError(f"Erreur complète KMeans: {e}")

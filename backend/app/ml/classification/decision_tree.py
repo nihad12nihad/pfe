@@ -82,39 +82,41 @@ class DecisionTreeModel:
             logger.error(f"Erreur de chargement des données: {str(e)}")
             raise
 
-    def train(self, data_path: Union[str, Path], target_column: str, test_size: float = 0.2) -> Dict[str, Any]:
-        """
-        Entraîne et évalue le modèle Decision Tree.
-        
-        Args:
-            data_path: Chemin vers les données
-            target_column: Nom de la colonne cible
-            test_size: Proportion des données de test
-            
-        Returns:
-            Dictionnaire de résultats standardisés
-        """
+    
+    def train(self, X: pd.DataFrame, y: pd.Series, test_size: float = 0.2) -> Dict[str, Any]:
         try:
-            X, y = self.load_data(data_path, target_column)
+            # 1) Encodage conditionnel de y
+            if y.dtype == 'object' or str(y.dtype).startswith('category'):
+               y = self.label_encoder.fit_transform(y)
+               class_labels = {i: label for i, label in enumerate(self.label_encoder.classes_)}
+            else:
+               class_labels = list(np.unique(y))
+
+            # 2) Séparation train / test
             X_train, X_test, y_train, y_test = train_test_split(
-                X, y, test_size=test_size, random_state=self.random_state
+            X, y, test_size=test_size, random_state=self.random_state
             )
-            
+
+            # 3) Entraînement
             self.model.fit(X_train, y_train)
             y_pred = self.model.predict(X_test)
-            self.feature_importances_ = self.model.feature_importances_
-            
-            # Calcul des métriques
+            self.feature_importances_ = np.array(self.feature_importances_)
+
+
+            # 4) Calcul des métriques
             metrics = {
                 'accuracy': accuracy_score(y_test, y_pred),
                 'precision': precision_score(y_test, y_pred, average='weighted'),
                 'recall': recall_score(y_test, y_pred, average='weighted'),
                 'f1': f1_score(y_test, y_pred, average='weighted'),
             }
-            
-            # Matrice de confusion
+            y_test = np.array(y_test)  # Si y_test est une liste
+            y_pred = np.array(y_pred)  # Si y_pred est une liste
+
+            # 5) Matrice de confusion
             cm = confusion_matrix(y_test, y_pred)
-            
+
+            # 6) Construction du résultat
             self.results = {
                 'model_type': 'decision_tree',
                 'parameters': {
@@ -126,15 +128,16 @@ class DecisionTreeModel:
                 'confusion_matrix': cm.tolist(),
                 'classification_report': classification_report(y_test, y_pred, output_dict=True),
                 'feature_importances': dict(zip(X.columns, self.feature_importances_)),
-                'class_labels': {i: label for i, label in enumerate(self.label_encoder.classes_)},
-            }
-            
+                'class_labels': class_labels
+            } 
+
             logger.info("Entraînement terminé avec succès")
             return self.results
             
         except Exception as e:
-            logger.error(f"Erreur lors de l'entraînement: {str(e)}")
-            return {'status': 'failed', 'error': str(e)}
+            logger.error(f"Erreur lors de l'entraînement: {e}", exc_info=True)
+            raise RuntimeError(f"Échec de l'entraînement : {e}")
+
 
     def save_model(self, output_path: Union[str, Path] = None) -> str:
         """
@@ -239,24 +242,67 @@ class DecisionTreeModel:
             logger.error(f"Erreur de prédiction: {str(e)}")
             raise
 
-def run(data_path: str, target_column: str, **kwargs) -> Dict[str, Any]:
+def run(
+    X: pd.DataFrame,
+    y: pd.Series,
+    test_size: float = 0.2,
+    random_state: int = 42,
+    **kwargs
+) -> Dict[str, Any]:
+    """
+    Entraîne un DecisionTreeClassifier et renvoie un dict standardisé.
+    X : DataFrame des features
+    y : Series de la cible (objet ou numérique)
+    kwargs : tous les paramètres de DecisionTreeClassifier
+    """
     try:
-        # Convertir en Path absolu
-        data_path = Path(data_path).absolute()
-        logger.info(f"Chemin absolu des données : {data_path}")
-        
-        if not data_path.exists():
-            raise FileNotFoundError(f"Fichier introuvable : {data_path}")
-            
-        model = DecisionTreeModel(**kwargs)
-        results = model.train(str(data_path), target_column)  # Convertir en string pour pandas
-        
-        # Sauvegarde avec chemins absolus
-        model.save_results()
-        model.save_model()
-        
-        return results
-        
+        # 1) Gérez l'encodage de y sans modifier y d'origine
+        label_encoder = LabelEncoder()
+        if y.dtype == 'object' or str(y.dtype).startswith('category'):
+            y_enc = label_encoder.fit_transform(y)
+            class_labels = list(label_encoder.classes_)
+        else:
+            y_enc = y.values
+            class_labels = list(np.unique(y_enc))
+
+        # 2) Split train/test
+        X_train, X_test, y_train, y_test = train_test_split(
+            X.values, y_enc, test_size=test_size, random_state=random_state
+        )
+
+        # 3) Création et entraînement du modèle
+        model = DecisionTreeClassifier(random_state=random_state, **kwargs)
+        model.fit(X_train, y_train)
+
+        # 4) Prédictions
+        y_pred_enc = model.predict(X_test)
+
+        # 5) Calcul des métriques
+        metrics = {
+            "accuracy": accuracy_score(y_test, y_pred_enc),
+            "precision": precision_score(y_test, y_pred_enc, average="weighted", zero_division=0),
+            "recall": recall_score(y_test, y_pred_enc, average="weighted", zero_division=0),
+            "f1": f1_score(y_test, y_pred_enc, average="weighted", zero_division=0)
+        }
+
+        # 6) Matrice de confusion
+        cm = confusion_matrix(y_test, y_pred_enc)
+
+        # 7) Restaurer les prédictions dans l’espace des labels d’origine
+        if hasattr(label_encoder, "inverse_transform") and (y.dtype == 'object' or str(y.dtype).startswith('category')):
+            y_pred = label_encoder.inverse_transform(y_pred_enc).tolist()
+        else:
+            y_pred = y_pred_enc.tolist()
+
+        return {
+            "metrics": metrics,
+            "confusion_matrix": cm.tolist(),
+            "class_labels": class_labels,
+            "visualization_data": np.column_stack((X_test,)),  # X_test déjà array
+            "predictions": y_pred,
+            "model": "DecisionTreeClassifier"
+        }
+
     except Exception as e:
-        logger.error(f"Erreur complète : {str(e)}", exc_info=True)
-        return {'status': 'failed', 'error': str(e)}
+        # remonte une erreur claire pour FastAPI
+        raise RuntimeError(f"Erreur complète dans DecisionTree.run : {e}")

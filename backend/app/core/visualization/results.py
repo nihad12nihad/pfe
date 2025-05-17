@@ -1,80 +1,137 @@
-from .charts import chart
-import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from typing import Dict, Optional
+from sklearn.metrics import (
+    confusion_matrix, ConfusionMatrixDisplay,
+    roc_curve, auc, precision_score, recall_score,
+    mean_squared_error, mean_absolute_error, r2_score
+)
+from sklearn.inspection import permutation_importance
+from sklearn.metrics import silhouette_samples, silhouette_score
+from scipy.cluster.hierarchy import dendrogram, linkage
+import pandas as pd
+import numpy as np
+from IPython.display import display
 
-def plot_classification_results(metrics: Dict[str, float], algorithm_name: str) -> str:
-    """Visualisation des métriques de classification"""
-    if not metrics:
-        raise ValueError("Aucune métrique fournie")
-    
-    fig, ax = chart._prepare_figure()
-    sns.barplot(x=list(metrics.keys()), y=list(metrics.values()), ax=ax)
-    ax.bar_label(ax.containers[0], fmt='%.2f')
-    chart._apply_common_styling(
-        ax,
-        title=f"Performance de {algorithm_name}",
-        xlabel="Métriques",
-        ylabel="Score"
-    )
-    ax.set_ylim(0, 1)
-    return chart._save_figure(fig, f"classification_{algorithm_name}", "results")
 
-def plot_regression_results(metrics: Dict[str, float], algorithm_name: str) -> str:
-    """Visualisation des métriques de régression"""
-    if not metrics:
-        raise ValueError("Aucune métrique fournie")
-    
-    df = pd.DataFrame({
-        'Metric': list(metrics.keys()),
-        'Value': list(metrics.values())
-    })
-    
-    fig, ax = chart._prepare_figure()
-    sns.barplot(x='Value', y='Metric', data=df, ax=ax)
-    chart._apply_common_styling(
-        ax,
-        title=f"Performance de {algorithm_name} (Régression)",
-        xlabel="Score",
-        ylabel="Métriques"
-    )
-    return chart._save_figure(fig, f"regression_{algorithm_name}", "results")
+# Classification
 
-def plot_confusion_matrix(cm: np.ndarray, labels: list) -> str:
-    """Matrice de confusion visuelle"""
-    if cm.size == 0:
-        raise ValueError("Matrice de confusion vide")
-    
-    fig, ax = chart._prepare_figure()
-    sns.heatmap(cm, annot=True, fmt="d", 
-               xticklabels=labels, 
-               yticklabels=labels, 
-               cmap="Blues", cbar=False,
-               ax=ax)
-    chart._apply_common_styling(
-        ax,
-        title="Matrice de confusion",
-        xlabel="Prédit",
-        ylabel="Réel"
-    )
-    return chart._save_figure(fig, "confusion_matrix", "results")
+def plot_confusion_matrix(y_true, y_pred, labels=None):
+    cm = confusion_matrix(y_true, y_pred)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
+    disp.plot(cmap='Blues')
+    plt.title("Matrice de confusion")
+    plt.tight_layout()
+    plt.show()
 
-def plot_clusters(data: np.ndarray, labels: np.ndarray, title: str = "Clusters") -> str:
-    """Visualisation 2D des clusters"""
-    if data.shape[1] < 2:
-        raise ValueError("Les données doivent avoir au moins 2 dimensions")
-    
-    fig, ax = chart._prepare_figure()
-    scatter = ax.scatter(data[:,0], data[:,1], c=labels, 
-                        cmap="viridis", alpha=0.6, 
-                        edgecolors='w', linewidths=0.5)
-    plt.legend(*scatter.legend_elements(), title="Clusters")
-    chart._apply_common_styling(
-        ax,
-        title=title,
-        xlabel="Dimension 1",
-        ylabel="Dimension 2"
-    )
-    return chart._save_figure(fig, "clusters", "clustering")
+def plot_roc_curve(y_true, y_scores):
+    fpr, tpr, thresholds = roc_curve(y_true, y_scores)
+    roc_auc = auc(fpr, tpr)
+    plt.figure()
+    plt.plot(fpr, tpr, label=f'ROC curve (AUC = {roc_auc:.2f})')
+    plt.plot([0, 1], [0, 1], 'k--')
+    plt.xlabel("Taux de faux positifs")
+    plt.ylabel("Taux de vrais positifs")
+    plt.title("Courbe ROC")
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+def plot_classification_scores(scores_dict):
+    names = list(scores_dict.keys())
+    values = list(scores_dict.values())
+    plt.figure(figsize=(8, 6))
+    sns.barplot(x=names, y=values)
+    plt.title("Scores de classification")
+    plt.tight_layout()
+    plt.show()
+
+def plot_feature_importances(model, feature_names):
+    if hasattr(model, 'feature_importances_'):
+        importances = model.feature_importances_
+    else:
+        return  # Pas applicable
+    sorted_idx = np.argsort(importances)
+    plt.figure(figsize=(10, 6))
+    plt.barh(np.array(feature_names)[sorted_idx], importances[sorted_idx])
+    plt.title("Importance des variables")
+    plt.tight_layout()
+    plt.show()
+
+# Régression
+
+def plot_residuals(y_true, y_pred):
+    residuals = y_true - y_pred
+    plt.figure(figsize=(8, 6))
+    sns.residplot(x=y_pred, y=residuals, lowess=True)
+    plt.xlabel("Valeurs prédites")
+    plt.ylabel("Résidus")
+    plt.title("Courbe des résidus")
+    plt.tight_layout()
+    plt.show()
+
+def plot_true_vs_pred(y_true, y_pred):
+    plt.figure(figsize=(8, 6))
+    plt.scatter(y_true, y_pred)
+    plt.plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], 'r--')
+    plt.xlabel("Valeurs réelles")
+    plt.ylabel("Valeurs prédites")
+    plt.title("Vrai vs Prédit")
+    plt.tight_layout()
+    plt.show()
+
+def plot_regression_errors(y_true, y_pred):
+    mse = mean_squared_error(y_true, y_pred)
+    rmse = np.sqrt(mse)
+    mae = mean_absolute_error(y_true, y_pred)
+    r2 = r2_score(y_true, y_pred)
+
+    scores = {"MSE": mse, "RMSE": rmse, "MAE": mae, "R²": r2}
+    plot_classification_scores(scores)
+
+# Clustering
+
+def plot_clusters_2d(X, labels):
+    plt.figure(figsize=(8, 6))
+    plt.scatter(X[:, 0], X[:, 1], c=labels, cmap='viridis')
+    plt.title("Visualisation des clusters (2D)")
+    plt.tight_layout()
+    plt.show()
+
+def plot_silhouette(X, labels):
+    silhouette_vals = silhouette_samples(X, labels)
+    plt.figure(figsize=(8, 6))
+    sns.histplot(silhouette_vals, bins=20, kde=True)
+    plt.title("Silhouette plot")
+    plt.xlabel("Score de silhouette")
+    plt.tight_layout()
+    plt.show()
+
+def plot_dendrogram(X):
+    linked = linkage(X, method='ward')
+    plt.figure(figsize=(10, 7))
+    dendrogram(linked)
+    plt.title("Dendrogramme (clustering hiérarchique)")
+    plt.tight_layout()
+    plt.show()
+
+# Association
+
+def plot_association_rules_graph(rules):
+    import networkx as nx
+    G = nx.DiGraph()
+    for i, rule in rules.iterrows():
+        for antecedent in rule['antecedents']:
+            for consequent in rule['consequents']:
+                G.add_edge(antecedent, consequent, weight=rule['lift'])
+    plt.figure(figsize=(12, 8))
+    pos = nx.spring_layout(G, k=0.5)
+    edge_weights = [G[u][v]['weight'] for u, v in G.edges()]
+    nx.draw(G, pos, with_labels=True, node_size=1500, node_color="skyblue",
+            font_size=10, edge_color=edge_weights, edge_cmap=plt.cm.Blues,
+            width=2, arrows=True)
+    plt.title("Graphes des règles d'association")
+    plt.tight_layout()
+    plt.show()
+
+def display_rules_table(rules):
+    display(rules[['antecedents', 'consequents', 'support', 'confidence', 'lift']])
