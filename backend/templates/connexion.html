@@ -1,38 +1,53 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Connexion</title>
 </head>
 <body>
     <div class="container">
         <div class="form">
             <h1>Connexion</h1>
 
-            {% if messages %}
-            <div class="error-messages">
-                {% for message in messages %}
-                <p class="error">{{ message }} </p>
-                {% endfor %}
-            <div>
+            <!-- Messages d'erreur -->
+            {% if error_type %}
+                <div class="error">
+                    {% if error_type == "user_not_found" %}
+                        ❌ Utilisateur non trouvé. 
+                        <a href="/auth/inscription">Créer un compte ?</a>
+                    {% elif error_type == "wrong_password" %}
+                        ❌ Mot de passe incorrect. 
+                        <a href="/auth/reset-password">Mot de passe oublié ?</a>
+                    {% endif %}
+                </div>
             {% endif %}
 
-            <form method="post" action="{% url 'connexion' %}">
-                {% csrf_token %}
+            <form method="post" action="/auth/connexion">
                 <label for="username">Nom d'utilisateur</label>
-                <input type="text" name="username" placeholder="Entrez votre nom d'utilisateur" required>
+                <input 
+                    type="text" 
+                    name="username" 
+                    placeholder="Entrez votre nom d'utilisateur" 
+                    value="{{ username if username else '' }}"
+                    required
+                >
+                
                 <label for="password">Mot de passe</label>
-                <input type="password" name="password" required>
+                <input 
+                    type="password" 
+                    name="password" 
+                    placeholder="Entrez votre mot de passe" 
+                    required
+                >
+                
                 <button type="submit">Se connecter</button>
             </form>
-            <p class="link">Pas encore inscrit ? <a href="{% url 'inscription' %}">S'inscrire</a></p>
+            <p class="link">Pas encore inscrit ? <a href="/auth/inscription">S'inscrire</a></p>
         </div>
     </div>
-    
     <style>
         /* CSS */
-        /* Import Google font - Poppins */
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600;700&display=swap');
 
         * {
@@ -44,6 +59,7 @@
 
         h1 {
             margin: 20px 0;
+            text-align: center;
         }
 
         body {
@@ -62,11 +78,12 @@
             box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
         }
 
-        .container .form {
+        .form {
             padding: 30px;
         }
 
         label {
+            display: block;
             padding: 10px 0;
             color: #009579;
             cursor: pointer;
@@ -79,23 +96,10 @@
             border: 1px solid #ddd;
             border-radius: 6px;
             outline: none;
-            margin-bottom: 15px;
-            margin-top: 10px;
-        }
-
-        a {
-            font-size: 16px;
-            color: #009579;
-            text-decoration: none;
-        }
-
-        a:hover {
-            text-decoration: underline;
+            margin: 10px 0 15px 0;
         }
 
         button {
-            color: #fff;
-            background: #009579;
             width: 100%;
             padding: 10px;
             font-size: 17px;
@@ -103,6 +107,10 @@
             border: none;
             border-radius: 6px;
             outline: none;
+            background: #009579;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s;
         }
 
         button:hover {
@@ -112,17 +120,30 @@
         .link {
             text-align: center;
             margin-top: 20px;
+            color: #666;
         }
 
         .error {
-            background-color: red;
-            color: #fff;
+            background-color: #dc3545;
+            color: white;
             border-radius: 6px;
-            padding: 10px;
-            margin-bottom: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
             font-size: 14px;
-            text-align: center;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .error a {
+            color: #ffeb3b;
+            text-decoration: underline;
+            margin-left: 5px;
+        }
+
+        .error a:hover {
+            color: #fff;
         }
     </style>
 </body>
-</html> 
+</html>
