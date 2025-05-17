@@ -1,0 +1,107 @@
+Structure du dossier
+Le numéro de série du volume est 6C57-6C96
+C:.
+¦   .gitignore
+¦   arborescence.txt
+¦   README.md
+¦   
++---backend
+¦   +---app
+¦   ¦   ¦   dependencies.py
+¦   ¦   ¦   main.py
+¦   ¦   ¦   security.py
+¦   ¦   ¦   __init__.py
+¦   ¦   ¦   
+¦   ¦   +---api
+¦   ¦   ¦       analyze_routes.py
+¦   ¦   ¦       auth_routes.py
+¦   ¦   ¦       compare_routes.py
+¦   ¦   ¦       export_routes.py
+¦   ¦   ¦       preprocess_routes.py
+¦   ¦   ¦       upload_routes.py
+¦   ¦   ¦       visualisation_routes.py
+¦   ¦   ¦       __init__.py
+¦   ¦   ¦       
+¦   ¦   +---auth
+¦   ¦   ¦       models.py
+¦   ¦   ¦       routes.py
+¦   ¦   ¦       security.py
+¦   ¦   ¦       
+¦   ¦   +---config
+¦   ¦   ¦       constants.py
+¦   ¦   ¦       database.py
+¦   ¦   ¦       settings.py
+¦   ¦   ¦       
+¦   ¦   +---core
+¦   ¦   ¦   ¦   algorithms.py
+¦   ¦   ¦   ¦   models.py
+¦   ¦   ¦   ¦   preprocessing.py
+¦   ¦   ¦   ¦   __init__.py
+¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---visualization
+¦   ¦   ¦           charts.py
+¦   ¦   ¦           preprocessing.py
+¦   ¦   ¦           results.py
+¦   ¦   ¦           __init__.py
+¦   ¦   ¦           
+¦   ¦   +---data
+¦   ¦   ¦   +---raw
+¦   ¦   ¦           diabetes.csv
+¦   ¦   ¦           
+¦   ¦   +---ml
+¦   ¦   ¦   ¦   __init__.py
+¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---association
+¦   ¦   ¦   ¦       apriori.py
+¦   ¦   ¦   ¦       __init__.py
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---classification
+¦   ¦   ¦   ¦       decision_tree.py
+¦   ¦   ¦   ¦       knn.py
+¦   ¦   ¦   ¦       naive_bayes.py
+¦   ¦   ¦   ¦       neural_network.py
+¦   ¦   ¦   ¦       random_forest.py
+¦   ¦   ¦   ¦       svm.py
+¦   ¦   ¦   ¦       __init__.py
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---clustering
+¦   ¦   ¦   ¦       agglomerative.py
+¦   ¦   ¦   ¦       dbscan.py
+¦   ¦   ¦   ¦       kmeans.py
+¦   ¦   ¦   ¦       __init__.py
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---regression
+¦   ¦   ¦           linear_regression.py
+¦   ¦   ¦           multiple_regression.py
+¦   ¦   ¦           __init__.py
+¦   ¦   ¦           
+¦   ¦   +---results
+¦   ¦   ¦       export.py
+¦   ¦   ¦       
+¦   ¦   +---__pycache__
+¦   ¦           main.cpython-313.pyc
+¦   ¦           __init__.cpython-313.pyc
+¦   ¦           
+¦   +---templates
+¦           connexion.html
+¦           inscription.html
+¦           visualisation.html
+¦           
++---frontend
+    ¦   analysis.html
+    ¦   compare.html
+    ¦   dashboard.html
+    ¦   export.html
+    ¦   index.html
+    ¦   login.html
+    ¦   upload.html
+    ¦   
+    +---css
+    ¦       style.css
+    ¦       
+    +---js
+            analysis.js
+            export.js
+            main.js
+            upload.js
+            
