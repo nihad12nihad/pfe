@@ -1,0 +1,18 @@
+@RELATION clients_banque
+
+@ATTRIBUTE age NUMERIC
+@ATTRIBUTE sexe {homme, femme}
+@ATTRIBUTE situation_familiale {celibataire, marie, divorce}
+@ATTRIBUTE revenu NUMERIC
+@ATTRIBUTE credit_en_cours {oui, non}
+@ATTRIBUTE cible {oui, non}  % le client est-il intéressé par une nouvelle offre ?
+
+@DATA
+25,homme,celibataire,25000,non,oui
+45,femme,marie,48000,oui,non
+30,homme,marie,32000,non,oui
+35,femme,divorce,41000,oui,non
+60,homme,marie,52000,oui,non
+28,femme,celibataire,27000,non,oui
+50,homme,divorce,39000,oui,non
+40,femme,marie,46000,non,oui

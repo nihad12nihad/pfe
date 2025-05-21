@@ -17,8 +17,15 @@ def detect_target_column(df: pd.DataFrame) -> Optional[str]:
     return None
 
 @router.get("/dataset/info", response_class=JSONResponse)
-def get_dataset_info(filename: str = Query(..., description="Nom du fichier CSV à analyser")):
+def get_dataset_info(
+    filename: str = Query(..., description="Nom du fichier à analyser"),
+    sep: str = Query(",", description="Séparateur CSV (par défaut: ',')")
+):
     filepath = os.path.join(DATA_DIR, filename)
+
+    # Vérifie que le fichier est bien un type supporté
+    if not filename.lower().endswith(('.csv', '.json', '.xlsx', '.arff')):
+        raise HTTPException(status_code=400, detail="Type de fichier non supporté")
 
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="Fichier introuvable")
@@ -26,9 +33,9 @@ def get_dataset_info(filename: str = Query(..., description="Nom du fichier CSV 
     try:
         # Tentative de lecture avec encodage par défaut puis fallback
         try:
-            df = pd.read_csv(filepath)
+            df = pd.read_csv(filepath, sep=sep)
         except UnicodeDecodeError:
-            df = pd.read_csv(filepath, encoding='latin-1')
+            df = pd.read_csv(filepath, sep=sep, encoding='latin-1')
 
         # Infos de base
         n_rows, n_cols = df.shape
@@ -40,9 +47,8 @@ def get_dataset_info(filename: str = Query(..., description="Nom du fichier CSV 
         # Valeurs manquantes
         missing = df.isnull().sum()
         missing_dict = missing[missing > 0].to_dict()
-
-        # Suggestions automatiques
         missing_suggestions = {}
+
         for col, count in missing_dict.items():
             dtype = str(df[col].dtype)
             if "float" in dtype or "int" in dtype:
@@ -64,7 +70,8 @@ def get_dataset_info(filename: str = Query(..., description="Nom du fichier CSV 
             "shape": {"rows": n_rows, "columns": n_cols},
             "preview": head_preview,
             "target_column": target_col,
-            "missing_values": missing_suggestions,
+            "missing_clean": len(missing_dict) == 0,
+            "missing_values": missing_suggestions if missing_suggestions else "Aucune valeur manquante détectée ✅",
             "statistics": stats,
             "median": median
         })

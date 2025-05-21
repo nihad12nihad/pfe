@@ -73,6 +73,7 @@ def standardize_output(raw_result: Dict[str, Any], algo_module: str) -> Dict[str
         'metrics': raw_result.get('metrics', {}),
         'model': raw_result.get('model'),
         'predictions': raw_result.get('predictions', []),
+        'actual': raw_result.get('actual', []),   # <-- Ajout ici !
         'visualization_data': raw_result.get('visualization_data', {})
     }
     
