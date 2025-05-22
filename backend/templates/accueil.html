@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card shadow-lg mt-4">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0">Tableau de bord</h4>
+    </div>
+    
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Mes Datasets</h5>
+                        <p class="card-text">Gérez vos fichiers de données</p>
+                        <a href="/datasets" class="btn btn-primary">
+                            Accéder aux datasets
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Nouvel Upload</h5>
+                        <p class="card-text">Ajoutez un nouveau dataset</p>
+                        <a href="/datasets/upload" class="btn btn-success">
+                            Uploader un fichier
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

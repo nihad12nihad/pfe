@@ -2,7 +2,7 @@ from fastapi import APIRouter, UploadFile, File, Form, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 import pandas as pd
-from core.visualization.preprocessing import (
+from app.core.visualization.preprocessing import(
     plot_correlation_matrix,
     plot_histogram,
     plot_boxplot,
@@ -61,7 +61,7 @@ from fastapi import APIRouter, UploadFile, File, Form, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 import pandas as pd
-from core.visualization.preprocessing import (
+from app.core.visualization.preprocessing import (
     plot_correlation_matrix,
     plot_histogram,
     plot_boxplot,
@@ -70,9 +70,9 @@ from core.visualization.preprocessing import (
     plot_missing_values,
     plot_unique_values
 )
-from core.visualization.results import (
+from app.core.visualization.results import (
     plot_confusion_matrix,
-    plot_classification_results
+    plot_classification_scores
 )
 
 router = APIRouter()

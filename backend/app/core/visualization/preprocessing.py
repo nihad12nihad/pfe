@@ -65,3 +65,22 @@ def plot_unique_values(df):
     plt.xticks(rotation=45)
     ax.set_title("Valeurs uniques par colonne")
     return save_plot(fig, "unique_values")
+
+
+# Ajoutez cette fonction à la fin de preprocessing.py
+
+def plot_categorical_count(df, column):
+    """Visualise le décompte des catégories pour une colonne donnée."""
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.countplot(x=column, data=df, ax=ax)
+    ax.set_title(f"Distribution de {column}")
+    plt.xticks(rotation=45)
+    return save_plot(fig, "categorical_count")
+
+def plot_linear_relationship(df, x_col, y_col):
+    """Visualise la relation linéaire entre deux variables."""
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.regplot(x=x_col, y=y_col, data=df, ax=ax, line_kws={"color": "red"})
+    ax.set_title(f"Relation linéaire entre {x_col} et {y_col}")
+    plt.xticks(rotation=45)
+    return save_plot(fig, "linear_relationship")

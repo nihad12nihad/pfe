@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card shadow-lg mt-4">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0"><i class="bi bi-table me-2"></i>Mes Datasets</h4>
+    </div>
+
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nom</th>
+                        <th>Description</th>
+                        <th>Taille</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dataset in datasets %}
+                    <tr>
+                        <td class="fw-bold">{{ dataset.nom }}</td>
+                        <td>{{ dataset.description|default('Aucune description', true) }}</td>
+                        <td>{{ (dataset.taille / 1024)|round(2) }} Ko</td>
+                        <td>{{ dataset.date_upload.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td>
+                            <div class="btn-group">
+                                <a href="/api/datasets/download/{{ dataset.id }}" 
+                                   class="btn btn-sm btn-outline-primary"
+                                   title="Télécharger">
+                                    <i class="bi bi-download"></i>
+                                </a>
+                                <button class="btn btn-sm btn-outline-danger delete-btn" 
+                                        data-id="{{ dataset.id }}"
+                                        title="Supprimer">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">
+                            <i class="bi bi-database-exclamation fs-1"></i><br>
+                            Aucun dataset trouvé
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

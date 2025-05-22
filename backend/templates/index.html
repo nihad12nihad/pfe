@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card shadow-lg mt-4">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0">Bienvenue sur DataMine</h4>
+    </div>
+    
+    <div class="card-body text-center">
+        <h2 class="mb-4">Plateforme d'analyse de données</h2>
+        <div class="row">
+            <div class="col-md-6 mx-auto">
+                <p class="lead">
+                    Commencez par vous connecter ou créer un compte pour gérer vos datasets
+                </p>
+                <div class="d-grid gap-3">
+                    <a href="/auth/connexion" class="btn btn-lg btn-success">Connexion</a>
+                    <a href="/auth/inscription" class="btn btn-lg btn-primary">Inscription</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

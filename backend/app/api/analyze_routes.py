@@ -22,10 +22,10 @@ from app.core.visualization.results import (
 from app.results.export import export_to_csv, export_to_json, export_to_excel
 from app.core.algorithms import get_algorithm
 from app.core.visualization.results import (
-    plot_classification_results,
-    plot_regression_results,  # Supprimez cette ligne si vous ne faites pas de régression
+    plot_classification_scores,
+    plot_regression_errors,  # Supprimez cette ligne si vous ne faites pas de régression
     plot_confusion_matrix,
-    plot_clusters
+    plot_clusters_2d
 )
 from app.results.export import export_to_csv, export_to_json, export_to_excel
 
@@ -159,12 +159,12 @@ def generate_visualizations(result: dict, algorithm_name: str) -> Dict[str, str]
     # Visualisation des métriques  principales
     if 'metrics' in result:
         if 'accuracy' in result['metrics']:  # Classification
-            vis_paths['metrics'] = plot_classification_results(
+            vis_paths['metrics'] = plot_classification_scores(
                 result['metrics'],
                 algorithm_name
             )
         elif 'r2_score' in result['metrics']:  # Régression
-            vis_paths['metrics'] = plot_regression_results(
+            vis_paths['metrics'] = plot_regression_errors(
                 result['metrics'],
                 algorithm_name
             )
@@ -178,7 +178,7 @@ def generate_visualizations(result: dict, algorithm_name: str) -> Dict[str, str]
     
     # Visualisation des clusters
     if 'cluster_labels' in result:
-        vis_paths['clusters'] = plot_clusters(
+        vis_paths['clusters'] = plot_clusters_2d(
             result.get('visualization_data', {}),
             algorithm_name
         )

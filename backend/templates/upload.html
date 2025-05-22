@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card shadow-lg mt-4">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0"><i class="bi bi-upload me-2"></i>Uploader un Dataset</h4>
+    </div>
+    
+    <div class="card-body">
+        {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+        
+        <form action="/api/datasets/upload" method="post" enctype="multipart/form-data" class="dropzone" id="uploadForm">
+            <div class="mb-3">
+                <label class="form-label">Fichier (CSV/ARFF) :</label>
+                <div class="custom-file">
+                    <input type="file" class="custom-file-input" name="file" id="file" required>
+                    <label class="custom-file-label" for="file">Choisir un fichier...</label>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Description :</label>
+                <textarea class="form-control" name="description" rows="3" 
+                    placeholder="Décrivez le contenu du dataset..."></textarea>
+            </div>
+
+            <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-success btn-lg">
+                    <i class="bi bi-cloud-upload me-2"></i>Uploader
+                </button>
+            </div>
+        </form>
+
+        <div class="progress mt-3" style="display: none;">
+            <div class="progress-bar progress-bar-striped" role="progressbar" style="width: 0%"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}

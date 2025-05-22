@@ -4,16 +4,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.config.database import get_db
 from app.core.models import Utilisateur
-from app.auth.security import hash_password,verify_password
+from app.auth.security import hash_password,verify_password,pwd_context,create_access_token
 #from app.main import templates
 from fastapi.templating import Jinja2Templates
+
 templates = Jinja2Templates(directory="templates")
 
 router = APIRouter(tags=["Authentification"])
 
 @router.get("/inscription", response_class=HTMLResponse)
 async def inscription_page(request: Request):
-    return templates.TemplateResponse("inscription.html", {"request": request})
+    return templates.TemplateResponse(
+        request,
+        "inscription.html",
+        {"request": request}
+    )
 
 @router.post("/inscription")
 async def handle_inscription(
@@ -25,15 +30,16 @@ async def handle_inscription(
 ):
     try:
          if password != password_confirm:
-             return templates.TemplateResponse("inscription.html", {
+             return templates.TemplateResponse(
+                 "inscription.html", {
                  "request": request,
                  "error": "les mots de passe ne correspondent pas"
         })
              
          existing_user = await db.execute(
-        select(Utilisateur).where(Utilisateur.nom== username)
-       )
-         if existing_user.scalar():
+             select(Utilisateur).where(Utilisateur.nom== username)
+             )
+         if existing_user.scalars().first():
              return templates.TemplateResponse("inscription.html",{
                  "request": request,
                  "error": "Nom d'utilisteur déja utilisé"
@@ -51,7 +57,7 @@ async def handle_inscription(
     except Exception as e :
         await db.rollback()
         print(f"Erreur d'inscription : {str(e)}")
-        return templates.TemplateResponse("inscription.htrml", {
+        return templates.TemplateResponse("inscription.html", {
             "request": request,
             "error": "Erreur technique lors de l'inscription"
         })
@@ -59,7 +65,11 @@ async def handle_inscription(
        
 @router.get("/connexion", response_class=HTMLResponse)
 async def connexion_page(request: Request):
-    return templates.TemplateResponse("connexion.html", {"request": request})
+    return templates.TemplateResponse(
+        request,
+        "connexion.html",
+        {"request": request}
+    )
 
 @router.post("/connexion")
 async def handle_connexion(
@@ -86,7 +96,9 @@ async def handle_connexion(
                 "username": username
                 })
             
-        response = RedirectResponse(url="/acceuil", status_code=status.HTTP_303_SEE_OTHER)
+        access_token = create_access_token({"sub": user.nom})
+        response = RedirectResponse(url="/accueil", status_code=status.HTTP_303_SEE_OTHER)
+        response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True, secure=False, samesite="lax",max_age=3600)
         return response
     
     except Exception as e :
@@ -95,3 +107,9 @@ async def handle_connexion(
             "request": request,
             "error_type": "system_error"
         })
+        
+@router.get("/deconnexion")
+async def deconnexion():
+    response = RedirectResponse(url="/")
+    response.delete_cookie("access_token")
+    return response

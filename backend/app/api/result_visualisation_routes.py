@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 import pandas as pd
 
-from core.visualization.charts import (
+from app.core.visualization.charts import (
     plot_confusion_matrix,
     plot_classification_results,
     plot_regression_results,
