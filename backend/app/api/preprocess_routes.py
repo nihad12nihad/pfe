@@ -17,11 +17,11 @@ from app.core.preprocessing import (
 router = APIRouter()
 
 class PreprocessRequest(BaseModel):
-    data: Optional[List[Dict[str, Any]]] = None  # Facultatif si on donne un fichier
-    filename: Optional[str] = None               # Nom du fichier CSV déjà uploadé
-    steps: List[str] = []                        # Étapes à réaliser
+    data: Optional[List[Dict[str, Any]]] = None
+    filename: Optional[str] = None
+    steps: List[str] = []
 
-    # Gestion des valeurs manquantes
+    # Valeurs manquantes
     numeric_strategy: Optional[str] = 'mean'
     categorical_strategy: Optional[str] = 'constant'
 
@@ -45,7 +45,7 @@ class PreprocessRequest(BaseModel):
 @router.post("/preprocess")
 async def preprocess_data(request: PreprocessRequest):
     try:
-        # Étape 0 : Chargement des données
+        # Chargement des données
         if request.filename:
             raw_dir = Path("app/data/raw")
             file_path = raw_dir / request.filename
@@ -56,6 +56,12 @@ async def preprocess_data(request: PreprocessRequest):
                 df = pd.read_csv(file_path)
             elif ext == '.json':
                 df = pd.read_json(file_path)
+            elif ext == '.xlsx':
+                df = pd.read_excel(file_path)
+            elif ext == '.arff':
+                from scipy.io import arff
+                data, meta = arff.loadarff(file_path)
+                df = pd.DataFrame(data)
             else:
                 raise HTTPException(status_code=400, detail=f"Format non supporté : {ext}")
         elif request.data:
@@ -63,18 +69,18 @@ async def preprocess_data(request: PreprocessRequest):
         else:
             raise HTTPException(status_code=400, detail="Aucune donnée fournie.")
 
-        # Étape 1 : Sélection manuelle des colonnes
+        # Étape : Sélection manuelle
         if request.selected_columns:
             cols = list(request.selected_columns)
             if request.target_col in df.columns and request.target_col not in cols:
                 cols.append(request.target_col)
             df = df[cols]
 
-        # Vérifie que la colonne cible est présente
+        # Vérifie colonne cible si sélection
         if 'select_features' in request.steps and request.target_col not in df.columns:
             raise HTTPException(status_code=400, detail=f"La colonne cible '{request.target_col}' est absente des données.")
 
-        # Étape 2 : Valeurs manquantes
+        # Étape : Valeurs manquantes
         if 'handle_missing_values' in request.steps:
             df = handle_missing_values(
                 df,
@@ -82,7 +88,7 @@ async def preprocess_data(request: PreprocessRequest):
                 categorical_strategy=request.categorical_strategy
             )
 
-        # Étape 3 : Encodage
+        # Étape : Encodage
         if 'encode_data' in request.steps:
             df = encode_data(
                 df,
@@ -90,8 +96,10 @@ async def preprocess_data(request: PreprocessRequest):
                 categorical_mapping=request.categorical_mapping,
                 encoding_strategy=request.encoding_strategy
             )
+            if df.isnull().values.any():
+                print("⚠️ Attention : des NaN sont présents après encodage.")
 
-        # Étape 4 : Normalisation
+        # Étape : Normalisation
         if 'normalize_data' in request.steps:
             df = normalize_data(
                 df,
@@ -99,7 +107,7 @@ async def preprocess_data(request: PreprocessRequest):
                 method=request.normalization_method
             )
 
-        # Étape 5 : Sélection des variables
+        # Étape : Sélection des variables
         if 'select_features' in request.steps:
             df = select_features(
                 df,
@@ -110,11 +118,17 @@ async def preprocess_data(request: PreprocessRequest):
                 custom_features=request.custom_features
             )
 
-        # Étape 6 : Sauvegarde
+        # Étape : Nettoyage (supprimer colonnes constantes ou vides)
+        if 'drop_useless' in request.steps:
+            df = df.loc[:, df.nunique() > 1]
+            df = df.dropna(axis=1, how='all')
+
+        # Sauvegarde
         processed_dir = Path("app/data/processed")
         processed_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = f"processed_{timestamp}.csv"
+        basename = Path(request.filename).stem if request.filename else "manual"
+        output_file = f"{basename}_processed_{timestamp}.csv"
         output_path = processed_dir / output_file
         df.to_csv(output_path, index=False)
 
@@ -122,9 +136,15 @@ async def preprocess_data(request: PreprocessRequest):
             "status": "success",
             "message": "Prétraitement terminé avec succès.",
             "columns": df.columns.tolist(),
+            "summary": {
+                "rows": df.shape[0],
+                "columns": df.shape[1],
+                "null_values": int(df.isnull().sum().sum())
+            },
             "data": df.to_dict(orient="records"),
             "file_path": str(output_path)
         }
+
     except HTTPException:
         raise
     except Exception as e:

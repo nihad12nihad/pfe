@@ -1,5 +1,7 @@
 # backend/main.py
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.auth import routes as routes
 from app.api import (
     analyze_routes,
     export_routes,
@@ -32,6 +34,14 @@ app = FastAPI(
     version="1.0"
 )
 
+# ✅ Ajouter le middleware CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # autorise le frontend React
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Inclure les routes
 app.include_router(analyze_routes.router)
